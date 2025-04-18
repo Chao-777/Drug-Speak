@@ -1,20 +1,36 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import CategoriesScreen from './screens/DrugCategories';
+
+const Stack = createStackNavigator();
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+      <SafeAreaProvider>
+        <NavigationContainer>
+            <StatusBar style="auto" />
+            <Stack.Navigator 
+              initialRouteName="Categories"
+              screenOptions={{
+                  headerStyle: {
+                    backgroundColor: '#f8f8f8',
+                  },
+                  headerTintColor: '#333',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+              }}
+            >
+              <Stack.Screen 
+                  name="Categories" 
+                  component={CategoriesScreen} 
+                  options={{ title: 'Drugs' }} 
+              />
+            </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
