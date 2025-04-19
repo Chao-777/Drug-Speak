@@ -1,38 +1,30 @@
 import React from 'react';
 import { 
    TouchableOpacity, 
-   Text, 
-   StyleSheet 
+   Text 
 } from 'react-native';
+import { Colors, Spacing, Typography, Shadows, Borders } from '../constants/color';
 
 const CategoryCard = ({ category, onPress }) => {
    return (
       <TouchableOpacity
-         style={styles.categoryItem}
+         style={{
+            backgroundColor: Colors.cardBackground,
+            padding: Spacing.lg,
+            marginVertical: Spacing.sm,
+            borderRadius: Borders.radius.medium,
+            ...Shadows.small
+         }}
          onPress={onPress}
       >
-         <Text style={styles.categoryText}>
+         <Text style={{
+            fontSize: Typography.sizes.body,
+            color: Colors.textPrimary
+         }}>
             {category.name}({category.count})
          </Text>
       </TouchableOpacity>
    );
 };
-
-const styles = StyleSheet.create({
-   categoryItem: {
-      backgroundColor: '#fff',
-      padding: 20,
-      marginVertical: 8,
-      borderRadius: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.2,
-      shadowRadius: 1,
-      elevation: 2,
-   },
-   categoryText: {
-      fontSize: 16,
-   },
-});
 
 export default CategoryCard;
