@@ -30,10 +30,12 @@ const CategoriesScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container}>
          <Header title="Categories" />
          <FlatList
+            style={{ flex: 1, height: '100%' }}
             data={categories}
             renderItem={renderCategoryItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={true}
          />
       </SafeAreaView>
    );
@@ -46,6 +48,7 @@ const styles = StyleSheet.create({
    },
    listContainer: {
       padding: 10,
+      paddingBottom: 50,
    },
 });
 

@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import CategoriesScreen from './screens/DrugCategories';
+import DrugListScreen from './screens/DrugList';
 
 const Stack = createStackNavigator();
 
@@ -27,7 +28,12 @@ export default function App() {
               <Stack.Screen 
                   name="Categories" 
                   component={CategoriesScreen} 
-                  options={{ title: 'Drugs' }} 
+                  options={{ title: 'Drugs Categories' }} 
+              />
+              <Stack.Screen
+                  name="DrugList" 
+                  component={DrugListScreen} 
+                  options={{ title: 'Drug List' }}
               />
             </Stack.Navigator>
         </NavigationContainer>
