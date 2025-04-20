@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {  
    FlatList, 
-   StyleSheet,
    SafeAreaView 
 } from 'react-native';
 import { getCategories } from '../data/drugs';
 import CategoryCard from '../components/CategoryCard';
 import Header from '../components/Header';
+import { Colors, Spacing } from '../constants/color';
 
 const CategoriesScreen = ({ navigation }) => {
    const [categories, setCategories] = useState([]);
@@ -19,37 +19,34 @@ const CategoriesScreen = ({ navigation }) => {
    const renderCategoryItem = ({ item }) => (
       <CategoryCard 
          category={item} 
-         onPress={() => navigation.navigate('DrugList', { 
-            categoryId: item.id,
-            categoryName: item.name
-         })}
+         onPress={() => {
+            navigation.navigate('DrugList', { 
+               categoryId: item.id,
+               categoryName: item.name
+            });
+         }}
       />
    );
 
    return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={{
+         flex: 1,
+         backgroundColor: Colors.background
+      }}>
          <Header title="Categories" />
          <FlatList
             style={{ flex: 1, height: '100%' }}
             data={categories}
             renderItem={renderCategoryItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContainer}
+            contentContainerStyle={{
+               padding: Spacing.md,
+               paddingBottom: Spacing.xxl
+            }}
             showsVerticalScrollIndicator={true}
          />
       </SafeAreaView>
    );
 };
-
-const styles = StyleSheet.create({
-   container: {
-      flex: 1,
-      backgroundColor: '#f5f5f5',
-   },
-   listContainer: {
-      padding: 10,
-      paddingBottom: 50,
-   },
-});
 
 export default CategoriesScreen;
