@@ -19,8 +19,8 @@ const DrugListScreen = ({ route, navigation }) => {
       setCategoryName(name);
       
       navigation.setOptions({ 
-         title: name,
-         headerBackTitle: 'Back'
+         title: '',
+         headerBackTitle: 'Drugs in Category',
       });
       
       const drugsInCategory = getDrugsByCategory(categoryId);

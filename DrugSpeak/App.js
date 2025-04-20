@@ -28,12 +28,16 @@ export default function App() {
               <Stack.Screen 
                   name="Categories" 
                   component={CategoriesScreen} 
-                  options={{ title: 'Drugs Categories' }} 
+                  options={{title: 'Drugs',
+                            headerTitleAlign: 'left'
+                  }} 
               />
               <Stack.Screen
                   name="DrugList" 
                   component={DrugListScreen} 
-                  options={{ title: 'Drug List' }}
+                  options={({ route }) => ({
+                      title: route.params?.categoryName || 'Drug List',
+                  })}
               />
             </Stack.Navigator>
         </NavigationContainer>
