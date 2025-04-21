@@ -14,7 +14,10 @@ const DrugDetailScreen = ({ route, navigation }) => {
       setDrug(drugDetails);
       
       if (drugDetails) {
-         navigation.setOptions({ title: drugDetails.name });
+         navigation.setOptions({ 
+            title: '',
+            headerBackTitle: 'Drugs Details',
+         });
       }
    }, [drugId, navigation]);
 
