@@ -1,9 +1,77 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView } from 'react-native';
+import { ScrollView } from 'react-native';
+import styled from 'styled-components/native';
 import { getDrugById, categoryArray } from '../data/drugs';
 import PronunciationCard from '../components/PronunciationCard';
 import StudyButton from '../components/Button';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
+
+const Container = styled.SafeAreaView`
+   flex: 1;
+   background-color: ${Colors.background};
+`;
+
+const LoadingContainer = styled.View`
+   flex: 1;
+   justify-content: center;
+   align-items: center;
+   background-color: ${Colors.background};
+`;
+
+const LoadingText = styled.Text`
+   font-size: ${Typography.sizes.subtitle}px;
+   color: ${Colors.textSecondary};
+`;
+
+const HeaderContainer = styled.View`
+   padding: ${Spacing.lg}px;
+   background-color: ${Colors.cardBackground};
+   align-items: center;
+   border-bottom-width: ${Borders.width.thin}px;
+   border-bottom-color: ${Colors.border};
+`;
+
+const DrugName = styled.Text`
+   font-size: ${Typography.sizes.heading}px;
+   font-weight: ${Typography.weights.bold};
+   color: ${Colors.textPrimary};
+   text-align: center;
+`;
+
+const Formula = styled.Text`
+   font-size: ${Typography.sizes.body}px;
+   color: ${Colors.textSecondary};
+   margin-top: ${Spacing.xs}px;
+`;
+
+const SectionContainer = styled.View`
+   padding: ${Spacing.lg}px;
+   background-color: ${Colors.cardBackground};
+   border-bottom-width: ${Borders.width.thin}px;
+   border-bottom-color: ${Colors.border};
+`;
+
+const SectionText = styled.Text`
+   font-size: ${Typography.sizes.body}px;
+   color: ${Colors.textPrimary};
+   ${props => props.lineHeight && `line-height: ${props.lineHeight}px`};
+`;
+
+const BoldText = styled.Text`
+   font-weight: ${Typography.weights.bold};
+`;
+
+const PronunciationHeader = styled.Text`
+   font-size: ${Typography.sizes.subtitle}px;
+   font-weight: ${Typography.weights.bold};
+   color: ${Colors.textPrimary};
+   margin-bottom: ${Spacing.sm}px;
+`;
+
+const PronunciationContainer = styled.View`
+   padding: ${Spacing.lg}px;
+   background-color: ${Colors.cardBackground};
+`;
 
 const DrugDetailScreen = ({ route, navigation }) => {
    const { drugId } = route.params;
@@ -36,103 +104,46 @@ const DrugDetailScreen = ({ route, navigation }) => {
 
    if (!drug) {
       return (
-         <View style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: Colors.background
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.subtitle,
-               color: Colors.textSecondary
-            }}>Loading...</Text>
-         </View>
+         <LoadingContainer>
+            <LoadingText>Loading...</LoadingText>
+         </LoadingContainer>
       );
    }
 
    return (
-      <SafeAreaView style={{
-         flex: 1,
-         backgroundColor: Colors.background
-      }}>
+      <Container>
          <ScrollView>
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               alignItems: 'center',
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border
-            }}>
-               <Text style={{
-                  fontSize: Typography.sizes.heading,
-                  fontWeight: Typography.weights.bold,
-                  color: Colors.textPrimary,
-                  textAlign: 'center'
-               }}>
-                  {drug.name}
-               </Text>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  color: Colors.textSecondary,
-                  marginTop: Spacing.xs
-               }}>
-                  {drug.molecular_formula}
-               </Text>
-            </View>
+            <HeaderContainer>
+               <DrugName>{drug.name}</DrugName>
+               <Formula>{drug.molecular_formula}</Formula>
+            </HeaderContainer>
 
             {drug.other_names && drug.other_names.length > 0 && (
-               <View style={{
-                  padding: Spacing.lg,
-                  backgroundColor: Colors.cardBackground,
-                  borderBottomWidth: Borders.width.thin,
-                  borderBottomColor: Colors.border
-               }}>
-                  <Text style={{ fontSize: Typography.sizes.body, color: Colors.textPrimary }}>
-                     <Text style={{ fontWeight: Typography.weights.bold }}>Also known as: </Text>
+               <SectionContainer>
+                  <SectionText>
+                     <BoldText>Also known as: </BoldText>
                      {drug.other_names.join(', ')}
-                  </Text>
-               </View>
+                  </SectionText>
+               </SectionContainer>
             )}
 
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border
-            }}>
-               <Text style={{ fontSize: Typography.sizes.body, color: Colors.textPrimary }}>
-                  <Text style={{ fontWeight: Typography.weights.bold }}>Categories: </Text>
+            <SectionContainer>
+               <SectionText>
+                  <BoldText>Categories: </BoldText>
                   {getCategoryNames(drug.categories)}
-               </Text>
-            </View>
+               </SectionText>
+            </SectionContainer>
 
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border
-            }}>
-               <Text style={{ 
-                  fontSize: Typography.sizes.body, 
-                  color: Colors.textPrimary,
-                  lineHeight: Typography.sizes.body * 1.5
-               }}>
+            <SectionContainer>
+               <SectionText lineHeight={Typography.sizes.body * 1.5}>
                   {drug.desc}
-               </Text>
-            </View>
+               </SectionText>
+            </SectionContainer>
 
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground
-            }}>
-               <Text style={{ 
-                  fontSize: Typography.sizes.subtitle, 
-                  fontWeight: Typography.weights.bold, 
-                  color: Colors.textPrimary,
-                  marginBottom: Spacing.sm
-               }}>
+            <PronunciationContainer>
+               <PronunciationHeader>
                   Pronunciation
-               </Text>
+               </PronunciationHeader>
                {drug.sounds && drug.sounds.map((sound, index) => (
                   <PronunciationCard 
                      key={`${drug.id}_${sound.gender}`}
@@ -141,11 +152,11 @@ const DrugDetailScreen = ({ route, navigation }) => {
                      audioFile={sound.file}
                   />
                ))}
-            </View>
+            </PronunciationContainer>
 
             <StudyButton onPress={addToStudyList} />
          </ScrollView>
-      </SafeAreaView>
+      </Container>
    );
 };
 

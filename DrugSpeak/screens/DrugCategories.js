@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import {  
-   FlatList, 
-   SafeAreaView 
-} from 'react-native';
+import { FlatList } from 'react-native';
+import styled from 'styled-components/native';
 import { getCategories } from '../data/drugs';
 import CategoryCard from '../components/CategoryCard';
 import Header from '../components/Header';
 import { Colors, Spacing } from '../constants/color';
+
+
+const Container = styled.SafeAreaView`
+   flex: 1;
+   background-color: ${Colors.background};
+`;
+
+const StyledFlatList = styled(FlatList)`
+   flex: 1;
+   height: 100%;
+`;
 
 const CategoriesScreen = ({ navigation }) => {
    const [categories, setCategories] = useState([]);
@@ -29,13 +38,9 @@ const CategoriesScreen = ({ navigation }) => {
    );
 
    return (
-      <SafeAreaView style={{
-         flex: 1,
-         backgroundColor: Colors.background
-      }}>
+      <Container>
          <Header title="Categories" />
-         <FlatList
-            style={{ flex: 1, height: '100%' }}
+         <StyledFlatList
             data={categories}
             renderItem={renderCategoryItem}
             keyExtractor={(item) => item.id}
@@ -45,7 +50,7 @@ const CategoriesScreen = ({ navigation }) => {
             }}
             showsVerticalScrollIndicator={true}
          />
-      </SafeAreaView>
+      </Container>
    );
 };
 

@@ -1,48 +1,54 @@
 import React from 'react';
-import { 
-   TouchableOpacity, 
-   Text, 
-} from 'react-native';
+import styled from 'styled-components/native';
 import { Colors, Spacing, Typography, Shadows, Borders } from '../constants/color';
+
+const CardContainer = styled.TouchableOpacity`
+   background-color: ${Colors.cardBackground};
+   padding: ${Spacing.lg}px;
+   margin-vertical: ${Spacing.sm}px;
+   border-radius: ${Borders.radius.medium}px;
+   shadow-color: ${Shadows.small.shadowColor};
+   shadow-offset: ${Shadows.small.shadowOffset.width}px ${Shadows.small.shadowOffset.height}px;
+   shadow-opacity: ${Shadows.small.shadowOpacity};
+   shadow-radius: ${Shadows.small.shadowRadius}px;
+   elevation: ${Shadows.small.elevation};
+`;
+
+const DrugName = styled.Text`
+   font-size: ${Typography.sizes.body}px;
+   font-weight: ${Typography.weights.medium};
+   color: ${Colors.textPrimary};
+`;
+
+const OtherNames = styled.Text`
+   font-size: ${Typography.sizes.small}px;
+   color: ${Colors.textSecondary};
+   margin-top: ${Spacing.xs}px;
+`;
+
+const Formula = styled.Text`
+   font-size: ${Typography.sizes.small}px;
+   color: ${Colors.textLight};
+   margin-top: ${Spacing.xs}px;
+`;
 
 const DrugCard = ({ drug, onPress }) => {
    return (
-      <TouchableOpacity
-         style={{
-            backgroundColor: Colors.cardBackground,
-            padding: Spacing.lg,
-            marginVertical: Spacing.sm,
-            borderRadius: Borders.radius.medium,
-            ...Shadows.small
-         }}
-         onPress={onPress}
-      >
-         <Text style={{
-            fontSize: Typography.sizes.body,
-            fontWeight: Typography.weights.medium,
-            color: Colors.textPrimary
-         }}>
+      <CardContainer onPress={onPress}>
+         <DrugName>
             {drug.name}
-         </Text>
+         </DrugName>
          
          {drug.other_names && drug.other_names.length > 0 && (
-            <Text style={{
-               fontSize: Typography.sizes.small,
-               color: Colors.textSecondary,
-               marginTop: Spacing.xs
-            }}>
+            <OtherNames>
                {drug.other_names.join(', ')}
-            </Text>
+            </OtherNames>
          )}
          
-         <Text style={{
-            fontSize: Typography.sizes.small,
-            color: Colors.textLight,
-            marginTop: Spacing.xs
-         }}>
+         <Formula>
             {drug.molecular_formula}
-         </Text>
-      </TouchableOpacity>
+         </Formula>
+      </CardContainer>
    );
 };
 

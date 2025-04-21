@@ -1,29 +1,33 @@
 import React from 'react';
-import { 
-   TouchableOpacity, 
-   Text 
-} from 'react-native';
+import styled from 'styled-components/native';
 import { Colors, Spacing, Typography, Shadows, Borders } from '../constants/color';
+
+
+const CardContainer = styled.TouchableOpacity`
+   background-color: ${Colors.cardBackground};
+   padding: ${Spacing.lg}px;
+   margin-vertical: ${Spacing.sm}px;
+   border-radius: ${Borders.radius.medium}px;
+   shadow-color: ${Shadows.small.shadowColor};
+   shadow-offset: ${Shadows.small.shadowOffset.width}px ${Shadows.small.shadowOffset.height}px;
+   shadow-opacity: ${Shadows.small.shadowOpacity};
+   shadow-radius: ${Shadows.small.shadowRadius}px;
+   elevation: ${Shadows.small.elevation};
+`;
+
+
+const CardText = styled.Text`
+   font-size: ${Typography.sizes.body}px;
+   color: ${Colors.textPrimary};
+`;
 
 const CategoryCard = ({ category, onPress }) => {
    return (
-      <TouchableOpacity
-         style={{
-            backgroundColor: Colors.cardBackground,
-            padding: Spacing.lg,
-            marginVertical: Spacing.sm,
-            borderRadius: Borders.radius.medium,
-            ...Shadows.small
-         }}
-         onPress={onPress}
-      >
-         <Text style={{
-            fontSize: Typography.sizes.body,
-            color: Colors.textPrimary
-         }}>
+      <CardContainer onPress={onPress}>
+         <CardText>
             {category.name}({category.count})
-         </Text>
-      </TouchableOpacity>
+         </CardText>
+      </CardContainer>
    );
 };
 
