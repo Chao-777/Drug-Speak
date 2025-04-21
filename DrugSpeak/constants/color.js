@@ -1,35 +1,41 @@
-
 export const Colors = {
-   primary: '#4a90e2',
-   primaryDark: '#2a6bc2',
-   primaryLight: '#7ab1ff',
+   primary: '#FF7E33',
+   primaryDark: '#E05E00',
+   primaryLight: '#FFA366',
    
-   secondary: '#f0f0f0',
-   secondaryDark: '#d0d0d0',
-   secondaryLight: '#ffffff',
+   secondary: 'rgba(255, 255, 255, 0.85)', 
+   secondaryDark: 'rgba(230, 230, 230, 0.85)',
+   secondaryLight: 'rgba(255, 255, 255, 0.95)',
    
    textPrimary: '#333333',
    textSecondary: '#666666',
    textLight: '#999999',
    
    success: '#4CAF50',
-   warning: '#FFC107',
+   warning: '#FF9800', 
    error: '#F44336',
    info: '#2196F3',
    
-   background: '#f5f5f5',
-   cardBackground: '#ffffff',
+   background: '#F9F9F9',
+   cardBackground: 'rgba(255, 255, 255, 0.75)', 
    
    male: {
-      background: '#e6f2ff',
+      background: 'rgba(230, 242, 255, 0.8)',
       text: '#0066cc'
    },
    female: {
-      background: '#ffe6f2',
+      background: 'rgba(255, 230, 242, 0.8)',
       text: '#cc0066'
    },
    
-   border: '#dddddd',
+   border: 'rgba(221, 221, 221, 0.5)',
+   
+   
+   glass: {
+      background: 'rgba(255, 255, 255, 0.6)',
+      border: 'rgba(255, 255, 255, 0.2)',
+      shadow: 'rgba(0, 0, 0, 0.1)'
+   }
 };
 
 export const Spacing = {
@@ -42,6 +48,14 @@ export const Spacing = {
 };
 
 export const Typography = {
+   fontFamily: {
+      inter: 'Inter',
+      interLight: 'Inter-Light',
+      interRegular: 'Inter-Regular',
+      interMedium: 'Inter-Medium',
+      interSemiBold: 'Inter-SemiBold',
+      interBold: 'Inter-Bold',
+   },
    sizes: {
       small: 12,
       body: 16,
@@ -51,13 +65,37 @@ export const Typography = {
       large: 30,
    },
    weights: {
+      light: '300',
       regular: 'normal',
       medium: '500',
+      semiBold: '600',
       bold: 'bold',
    },
 };
 
 export const Shadows = {
+   glassSmall: {
+      shadowColor: '#FF7E33',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 3,
+   },
+   glassMedium: {
+      shadowColor: '#FF7E33',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 12,
+      elevation: 5,
+   },
+   glassLarge: {
+      shadowColor: '#FF7E33',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 1,
+      shadowRadius: 16,
+      elevation: 8,
+   },
+
    small: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
@@ -84,8 +122,8 @@ export const Shadows = {
 export const Borders = {
    radius: {
       small: 3,
-      medium: 5,
-      large: 10,
+      medium: 8,
+      large: 12,
       round: 50,
    },
    width: {
@@ -94,3 +132,14 @@ export const Borders = {
       thick: 2,
    },
 };
+
+
+export const theme = {
+   colors: Colors,
+   spacing: Spacing,
+   typography: Typography,
+   shadows: Shadows,
+   borders: Borders
+};
+
+export default theme;
