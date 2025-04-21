@@ -8,17 +8,22 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import FAIcon from 'react-native-vector-icons/FontAwesome5';
 import { Colors, Spacing, Borders } from '../constants/color';
+import { drugAudioMap } from '../data/drugAudioMap';
 
-const PronunciationCard = ({ drugName, gender, audioFile }) => {
+const PronunciationCard = ({ drugName, gender }) => {
    const [selectedSpeed, setSelectedSpeed] = useState('1.0');
    const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
 
-   const playAudio = async () => {
+   const playAudio = async (drugName, gender) => {
       try {
-         const { sound } = await Audio.Sound.createAsync(
-            audioFile,
-            { shouldPlay: true }
-         );
+         const audioFile = drugAudioMap[drugName]?.audio?.[gender];
+      
+         if (!audioFile) {
+            console.warn(`Audio not found for ${drugName} - ${gender}`);
+            return;
+         }
+      
+         const { sound } = await Audio.Sound.createAsync(audioFile, { shouldPlay: true });
          await sound.playAsync();
       } catch (error) {
          console.error('Error playing audio:', error);
@@ -33,12 +38,12 @@ const PronunciationCard = ({ drugName, gender, audioFile }) => {
          borderBottomWidth: Borders.width.thin,
          borderBottomColor: Colors.border
       }}>
-         <TouchableOpacity 
-            onPress={playAudio} 
-            style={{ padding: Spacing.md }}
+      <TouchableOpacity 
+         onPress={() => playAudio(drugName, gender)} 
+         style={{ padding: Spacing.md }}
          >
-            <Icon name="volume-up" size={24} color={Colors.textPrimary} />
-         </TouchableOpacity>
+         <Icon name="volume-up" size={24} color={Colors.textPrimary} />
+      </TouchableOpacity> 
 
          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{
