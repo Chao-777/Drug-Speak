@@ -1,4 +1,4 @@
-import { drugData, drugCategory } from '../resources/resource.js';
+import { drugData, drugCategory } from './resource.js';
 
 
 const categoryArray = Object.values(drugCategory);
