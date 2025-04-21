@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import CategoriesScreen from './screens/DrugCategories';
 import DrugListScreen from './screens/DrugList';
+import DrugDetailScreen from './screens/DrugDetail';
+import { Colors, Typography } from './constants/color';
 
 const Stack = createStackNavigator();
 
@@ -17,19 +19,20 @@ export default function App() {
               initialRouteName="Categories"
               screenOptions={{
                   headerStyle: {
-                    backgroundColor: '#f8f8f8',
+                    backgroundColor: Colors.secondary,
                   },
-                  headerTintColor: '#333',
+                  headerTintColor: Colors.textPrimary,
                   headerTitleStyle: {
-                    fontWeight: 'bold',
+                    fontWeight: Typography.weights.bold,
                   },
+                  headerTitleAlign: 'left',
               }}
             >
               <Stack.Screen 
                   name="Categories" 
                   component={CategoriesScreen} 
-                  options={{title: 'Drugs',
-                            headerTitleAlign: 'left'
+                  options={{
+                    title: 'Drugs'
                   }} 
               />
               <Stack.Screen
@@ -38,6 +41,11 @@ export default function App() {
                   options={({ route }) => ({
                       title: route.params?.categoryName || 'Drug List',
                   })}
+              />
+              <Stack.Screen 
+                name="DrugDetail" 
+                component={DrugDetailScreen} 
+                options={{ title: 'Drug Details' }} 
               />
             </Stack.Navigator>
         </NavigationContainer>
