@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import styled from 'styled-components/native';
+import { useDispatch, useSelector } from 'react-redux';
 import { getDrugById, categoryArray } from '../data/drugs';
 import PronunciationCard from '../components/PronunciationCard';
 import StudyButton from '../components/Button';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
+import { addToLearningList } from '../store/learningListSlice';
 
 const Container = styled.SafeAreaView`
    flex: 1;
@@ -73,9 +75,30 @@ const PronunciationContainer = styled.View`
    background-color: ${Colors.cardBackground};
 `;
 
+const InLearningListBadge = styled.View`
+   background-color: ${Colors.success};
+   padding: ${Spacing.xs}px ${Spacing.md}px;
+   border-radius: ${Borders.radius.small}px;
+   margin-top: ${Spacing.sm}px;
+`;
+
+const BadgeText = styled.Text`
+   color: white;
+   font-weight: ${Typography.weights.bold};
+   font-size: ${Typography.sizes.small}px;
+   text-align: center;
+`;
+
 const DrugDetailScreen = ({ route, navigation }) => {
    const { drugId } = route.params;
    const [drug, setDrug] = useState(null);
+   const dispatch = useDispatch();
+   const learningList = useSelector(state => state.learningList.learningList);
+   
+   // Check if the drug is already in learning list
+   const isInLearningList = drug ? 
+      learningList.some(item => item.id === drug.id) : 
+      false;
 
    useEffect(() => {
       const drugDetails = getDrugById(drugId);
@@ -90,7 +113,9 @@ const DrugDetailScreen = ({ route, navigation }) => {
    }, [drugId, navigation]);
 
    const addToStudyList = () => {
-      console.log(`Adding ${drug.name} to study list`);
+      if (drug && !isInLearningList) {
+         dispatch(addToLearningList(drug));
+      }
    };
    
    const getCategoryNames = (categoryIds) => {
@@ -116,6 +141,11 @@ const DrugDetailScreen = ({ route, navigation }) => {
             <HeaderContainer>
                <DrugName>{drug.name}</DrugName>
                <Formula>{drug.molecular_formula}</Formula>
+               {isInLearningList && (
+                  <InLearningListBadge>
+                     <BadgeText>Added to Learning List</BadgeText>
+                  </InLearningListBadge>
+               )}
             </HeaderContainer>
 
             {drug.other_names && drug.other_names.length > 0 && (
@@ -154,7 +184,9 @@ const DrugDetailScreen = ({ route, navigation }) => {
                ))}
             </PronunciationContainer>
 
-            <StudyButton onPress={addToStudyList} />
+            {!isInLearningList && drug && (
+               <StudyButton drug={drug} onPress={addToStudyList} />
+            )}
          </ScrollView>
       </Container>
    );
