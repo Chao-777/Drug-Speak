@@ -1,24 +1,17 @@
+// screens/DrugList.js
 import React, { useEffect, useState } from 'react';
-import { FlatList } from 'react-native';
-import styled from 'styled-components/native';
+import { FlatList, SafeAreaView } from 'react-native';
+import { useSelector } from 'react-redux';
 import { getDrugsByCategory, categoryArray } from '../data/drugs';
 import DrugCard from '../components/DrugCard';
 import Header from '../components/Header';
 import { Colors, Spacing } from '../constants/color';
 
-const Container = styled.SafeAreaView`
-   flex: 1;
-   background-color: ${Colors.background};
-`;
-
-const StyledFlatList = styled(FlatList)`
-   flex: 1;
-`;
-
 const DrugListScreen = ({ route, navigation }) => {
    const { categoryId } = route.params;
    const [drugs, setDrugs] = useState([]);
    const [categoryName, setCategoryName] = useState('');
+   const learningList = useSelector(state => state.learningList.learningList);
 
    useEffect(() => {
       const category = categoryArray.find(cat => cat.id === categoryId);
@@ -26,35 +19,43 @@ const DrugListScreen = ({ route, navigation }) => {
       setCategoryName(name);
       
       navigation.setOptions({ 
-         title: '',
-         headerBackTitle: 'Drugs in Category',
+      title: name,
+      headerBackTitle: 'Drugs in Category'
       });
       
       const drugsInCategory = getDrugsByCategory(categoryId);
       setDrugs(drugsInCategory);
    }, [categoryId, navigation]);
 
-   const renderDrugItem = ({ item }) => (
+   const renderDrugItem = ({ item }) => {
+      const isInLearningList = learningList.some(drug => drug.id === item.id);
+      
+      return (
       <DrugCard 
          drug={item}
+         isInLearningList={isInLearningList}
          onPress={() => navigation.navigate('DrugDetail', { drugId: item.id })}
       />
-   );
+      );
+   };
 
    return (
-      <Container>
-         <Header title={categoryName} />
-         <StyledFlatList
-            data={drugs}
-            renderItem={renderDrugItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{
-               padding: Spacing.md,
-               paddingBottom: Spacing.xxl
-            }}
-            showsVerticalScrollIndicator={true}
-         />
-      </Container>
+      <SafeAreaView style={{
+      flex: 1,
+      backgroundColor: Colors.background
+      }}>
+      <Header title={categoryName} />
+      <FlatList
+         data={drugs}
+         renderItem={renderDrugItem}
+         keyExtractor={(item) => item.id}
+         contentContainerStyle={{
+            padding: Spacing.md,
+            paddingBottom: Spacing.xxl
+         }}
+         showsVerticalScrollIndicator={true}
+      />
+      </SafeAreaView>
    );
 };
 
