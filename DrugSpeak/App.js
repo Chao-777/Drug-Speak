@@ -116,7 +116,6 @@ export const CustomTabBar = ({ activeTab, setActiveTab }) => {
         }}>Community</Text>
       </TouchableOpacity>
       
-      {/* Profile tab */}
       <TouchableOpacity 
         style={{
           flex: 1,

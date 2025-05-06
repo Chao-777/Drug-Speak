@@ -1,7 +1,8 @@
-import React from 'react';
-import { FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, View } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components/native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
 import { removeFromLearningList } from '../store/learningListSlice';
 
@@ -11,7 +12,7 @@ const Container = styled.SafeAreaView`
 `;
 
 const HeaderContainer = styled.View`
-   padding: ${Spacing.sm}px;
+   padding: ${Spacing.lg}px;
    background-color: ${Colors.cardBackground};
    align-items: center;
    border-bottom-width: ${Borders.width.thin}px;
@@ -22,6 +23,34 @@ const HeaderText = styled.Text`
    font-size: ${Typography.sizes.heading}px;
    font-weight: ${Typography.weights.bold};
    color: ${Colors.textPrimary};
+`;
+
+const SectionHeader = styled.TouchableOpacity`
+   flex-direction: row;
+   justify-content: space-between;
+   align-items: center;
+   padding: ${Spacing.lg}px;
+   background-color: ${Colors.secondary};
+   margin-top: ${Spacing.md}px;
+   border-radius: ${Borders.radius.medium}px;
+   margin-horizontal: ${Spacing.md}px;
+`;
+
+const SectionTitle = styled.View`
+   flex-direction: row;
+   align-items: center;
+`;
+
+const SectionName = styled.Text`
+   font-size: ${Typography.sizes.subtitle}px;
+   font-weight: ${Typography.weights.bold};
+   color: ${Colors.textPrimary};
+`;
+
+const SectionCount = styled.Text`
+   font-size: ${Typography.sizes.small}px;
+   color: ${Colors.textSecondary};
+   margin-left: ${Spacing.sm}px;
 `;
 
 const EmptyListContainer = styled.View`
@@ -40,13 +69,17 @@ const EmptyListText = styled.Text`
 
 const DrugCard = styled.View`
    background-color: ${Colors.cardBackground};
-   padding: ${Spacing.sm}px;
-   margin-horizontal: ${Spacing.sm}px;
+   padding: ${Spacing.lg}px;
+   margin-horizontal: ${Spacing.md}px;
    margin-vertical: ${Spacing.sm}px;
    border-radius: ${Borders.radius.medium}px;
    flex-direction: row;
    justify-content: space-between;
    align-items: center;
+`;
+
+const DrugInfo = styled.View`
+   flex: 1;
 `;
 
 const DrugName = styled.Text`
@@ -68,16 +101,12 @@ const OtherNames = styled.Text`
    font-style: italic;
 `;
 
-const ButtonContainer = styled.View`
-   margin-top: ${Spacing.md}px;
-   align-items: flex-end;
-`;
-
 const RemoveButton = styled.TouchableOpacity`
-   padding-vertical: ${Spacing.md}px;
+   padding-vertical: ${Spacing.xs}px;
    padding-horizontal: ${Spacing.md}px;
    background-color: ${Colors.error};
    border-radius: ${Borders.radius.small}px;
+   margin-left: ${Spacing.md}px;
 `;
 
 const RemoveText = styled.Text`
@@ -89,6 +118,12 @@ const RemoveText = styled.Text`
 const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
    const dispatch = useDispatch();
+   
+   const currentLearning = learningList.slice(0, Math.ceil(learningList.length / 2));
+   const finishedLearning = learningList.slice(Math.ceil(learningList.length / 2));
+   
+   const [currentExpanded, setCurrentExpanded] = useState(true);
+   const [finishedExpanded, setFinishedExpanded] = useState(false);
 
    const handleRemoveDrug = (drugId) => {
       dispatch(removeFromLearningList(drugId));
@@ -102,27 +137,25 @@ const LearningListScreen = ({ navigation }) => {
          shadowRadius: 1,
          elevation: 2,
       }}>
-         <DrugName>{item.name}</DrugName>
+         <DrugInfo>
+            <DrugName>{item.name}</DrugName>
+            
+            {item.other_names && item.other_names.length > 0 && (
+               <OtherNames>{item.other_names.join(', ')}</OtherNames>
+            )}
+            
+            <DrugFormula>{item.molecular_formula}</DrugFormula>
+         </DrugInfo>
          
-         {item.other_names && item.other_names.length > 0 && (
-            <OtherNames>{item.other_names.join(', ')}</OtherNames>
-         )}
-         
-         <DrugFormula>{item.molecular_formula}</DrugFormula>
-         
-         <ButtonContainer>
-            <RemoveButton onPress={() => handleRemoveDrug(item.id)}>
-               <RemoveText>Remove</RemoveText>
-            </RemoveButton>
-         </ButtonContainer>
+         <RemoveButton onPress={() => handleRemoveDrug(item.id)}>
+            <RemoveText>Remove</RemoveText>
+         </RemoveButton>
       </DrugCard>
    );
 
    return (
       <Container>
-         <HeaderContainer>
-            <HeaderText>Learning List</HeaderText>
-         </HeaderContainer>
+
          
          {learningList.length === 0 ? (
             <EmptyListContainer>
@@ -132,12 +165,54 @@ const LearningListScreen = ({ navigation }) => {
             </EmptyListContainer>
          ) : (
             <FlatList
-               data={learningList}
-               renderItem={renderDrugItem}
+               data={[]} 
+               ListHeaderComponent={() => (
+                  <View style={{ paddingBottom: 100 }}>
+                     {/* Current Learning Section */}
+                     <SectionHeader onPress={() => setCurrentExpanded(!currentExpanded)}>
+                        <SectionTitle>
+                           <SectionName>Current Learning</SectionName>
+                           <SectionCount>({currentLearning.length})</SectionCount>
+                        </SectionTitle>
+                        <Icon 
+                           name={currentExpanded ? "remove" : "add"} 
+                           size={24} 
+                           color={Colors.textPrimary} 
+                        />
+                     </SectionHeader>
+                     
+                     {currentExpanded && currentLearning.map(item => (
+                        <View key={item.id} style={{ marginTop: Spacing.sm }}>
+                           {renderDrugItem({ item })}
+                        </View>
+                     ))}
+                     
+                     <SectionHeader 
+                        onPress={() => setFinishedExpanded(!finishedExpanded)}
+                        style={{ marginTop: Spacing.lg }}
+                     >
+                        <SectionTitle>
+                           <SectionName>Finished</SectionName>
+                           <SectionCount>({finishedLearning.length})</SectionCount>
+                        </SectionTitle>
+                        <Icon 
+                           name={finishedExpanded ? "remove" : "add"} 
+                           size={24} 
+                           color={Colors.textPrimary} 
+                        />
+                     </SectionHeader>
+                     
+                     {finishedExpanded && finishedLearning.map(item => (
+                        <View key={item.id} style={{ marginTop: Spacing.sm }}>
+                           {renderDrugItem({ item })}
+                        </View>
+                     ))}
+                  </View>
+               )}
+               renderItem={() => null}
                keyExtractor={(item) => item.id}
                contentContainerStyle={{ 
-                  padding: Spacing.md,
-                  paddingBottom: 100 
+                  padding: Spacing.md
                }}
             />
          )}
