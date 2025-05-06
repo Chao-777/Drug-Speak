@@ -13,6 +13,7 @@ import CategoriesScreen from './screens/DrugCategories';
 import DrugListScreen from './screens/DrugList';
 import DrugDetailScreen from './screens/DrugDetail';
 import LearningListScreen from './screens/LearningList';
+import LearningScreen from './screens/Learning';
 
 
 const PlaceholderScreen = ({ title }) => (
@@ -163,9 +164,7 @@ const MainApp = () => {
             <Stack.Screen
               name="DrugList" 
               component={DrugListScreen} 
-              options={({ route }) => ({
-                title: route.params?.categoryName || 'Drug List',
-              })}
+              options={{ title:'Drug List'}}
             />
             <Stack.Screen 
               name="DrugDetail" 
@@ -194,6 +193,13 @@ const MainApp = () => {
               component={LearningListScreen} 
               options={{ title: 'Learning List' }} 
             />
+            <Stack.Screen 
+            name="LearningScreen" 
+            component={LearningScreen} 
+            options={({ route }) => ({ 
+                title: '' 
+            })}
+      />
           </Stack.Navigator>
         );
       

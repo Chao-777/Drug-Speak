@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { FlatList, View, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -102,7 +102,7 @@ const OtherNames = styled.Text`
 `;
 
 const RemoveButton = styled.TouchableOpacity`
-   padding-vertical: ${Spacing.xs}px;
+   padding-vertical: ${Spacing.md}px;
    padding-horizontal: ${Spacing.md}px;
    background-color: ${Colors.error};
    border-radius: ${Borders.radius.small}px;
@@ -119,8 +119,8 @@ const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
    const dispatch = useDispatch();
    
-   const currentLearning = learningList.slice(0, Math.ceil(learningList.length / 2));
-   const finishedLearning = learningList.slice(Math.ceil(learningList.length / 2));
+   const currentLearning = learningList.filter(drug => drug.status === 'current');
+   const finishedLearning = learningList.filter(drug => drug.status === 'finished');
    
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
@@ -130,6 +130,10 @@ const LearningListScreen = ({ navigation }) => {
    };
 
    const renderDrugItem = ({ item }) => (
+      <TouchableOpacity 
+      onPress={() => navigation.navigate('LearningScreen', { drug: item })}
+      activeOpacity={0.7}
+   >
       <DrugCard style={{
          shadowColor: '#000',
          shadowOffset: { width: 0, height: 1 },
@@ -147,10 +151,14 @@ const LearningListScreen = ({ navigation }) => {
             <DrugFormula>{item.molecular_formula}</DrugFormula>
          </DrugInfo>
          
-         <RemoveButton onPress={() => handleRemoveDrug(item.id)}>
+         <RemoveButton onPress={(e) => {
+            e.stopPropagation(); 
+            handleRemoveDrug(item.id);
+         }}>
             <RemoveText>Remove</RemoveText>
          </RemoveButton>
       </DrugCard>
+   </TouchableOpacity>
    );
 
    return (
@@ -168,7 +176,6 @@ const LearningListScreen = ({ navigation }) => {
                data={[]} 
                ListHeaderComponent={() => (
                   <View style={{ paddingBottom: 100 }}>
-                     {/* Current Learning Section */}
                      <SectionHeader onPress={() => setCurrentExpanded(!currentExpanded)}>
                         <SectionTitle>
                            <SectionName>Current Learning</SectionName>
