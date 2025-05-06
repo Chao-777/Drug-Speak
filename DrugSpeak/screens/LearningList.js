@@ -4,25 +4,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
-import { removeFromLearningList } from '../store/learningListSlice';
 
 const Container = styled.SafeAreaView`
    flex: 1;
    background-color: ${Colors.background};
-`;
-
-const HeaderContainer = styled.View`
-   padding: ${Spacing.lg}px;
-   background-color: ${Colors.cardBackground};
-   align-items: center;
-   border-bottom-width: ${Borders.width.thin}px;
-   border-bottom-color: ${Colors.border};
-`;
-
-const HeaderText = styled.Text`
-   font-size: ${Typography.sizes.heading}px;
-   font-weight: ${Typography.weights.bold};
-   color: ${Colors.textPrimary};
 `;
 
 const SectionHeader = styled.TouchableOpacity`
@@ -69,7 +54,7 @@ const EmptyListText = styled.Text`
 
 const DrugCard = styled.View`
    background-color: ${Colors.cardBackground};
-   padding: ${Spacing.lg}px;
+   padding: ${Spacing.md}px;
    margin-horizontal: ${Spacing.md}px;
    margin-vertical: ${Spacing.sm}px;
    border-radius: ${Borders.radius.medium}px;
@@ -101,19 +86,6 @@ const OtherNames = styled.Text`
    font-style: italic;
 `;
 
-const RemoveButton = styled.TouchableOpacity`
-   padding-vertical: ${Spacing.md}px;
-   padding-horizontal: ${Spacing.md}px;
-   background-color: ${Colors.error};
-   border-radius: ${Borders.radius.small}px;
-   margin-left: ${Spacing.md}px;
-`;
-
-const RemoveText = styled.Text`
-   color: white;
-   font-weight: ${Typography.weights.bold};
-   font-size: ${Typography.sizes.small}px;
-`;
 
 const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
@@ -125,9 +97,6 @@ const LearningListScreen = ({ navigation }) => {
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
 
-   const handleRemoveDrug = (drugId) => {
-      dispatch(removeFromLearningList(drugId));
-   };
 
    const renderDrugItem = ({ item }) => (
       <TouchableOpacity 
@@ -150,13 +119,6 @@ const LearningListScreen = ({ navigation }) => {
             
             <DrugFormula>{item.molecular_formula}</DrugFormula>
          </DrugInfo>
-         
-         <RemoveButton onPress={(e) => {
-            e.stopPropagation(); 
-            handleRemoveDrug(item.id);
-         }}>
-            <RemoveText>Remove</RemoveText>
-         </RemoveButton>
       </DrugCard>
    </TouchableOpacity>
    );
