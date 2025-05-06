@@ -9,17 +9,33 @@ export const learningListSlice = createSlice({
    initialState,
    reducers: {
       addToLearningList: (state, action) => {
-      if (!state.learningList.some(drug => drug.id === action.payload.id)) {
-         state.learningList.push(action.payload);
-      }
+         if (!state.learningList.some(drug => drug.id === action.payload.id)) {
+            const drugWithStatus = {
+               ...action.payload,
+               status: 'current' 
+            };
+            state.learningList.push(drugWithStatus);
+         }
       },
       removeFromLearningList: (state, action) => {
          state.learningList = state.learningList.filter(
-         drug => drug.id !== action.payload
+            drug => drug.id !== action.payload
          );
+      },
+      updateLearningStatus: (state, action) => {
+         const { id, status } = action.payload;
+         const drugIndex = state.learningList.findIndex(drug => drug.id === id);
+         if (drugIndex !== -1) {
+            state.learningList[drugIndex].status = status;
+         }
       }
    }
 });
 
-export const { addToLearningList, removeFromLearningList } = learningListSlice.actions;
+export const { 
+   addToLearningList, 
+   removeFromLearningList,
+   updateLearningStatus 
+} = learningListSlice.actions;
+
 export default learningListSlice.reducer;
