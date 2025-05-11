@@ -2,18 +2,40 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing } from '../constants/color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
 
-   const handleSignIn = () => {
-      if (email && password) {
-         setIsLoggedIn(true);
-      } else {
+   const handleSignIn = async () => {
+      if (!email || !password) {
          alert('Please enter both email and password');
-      }
-   };
+         return;
+         }
+      
+         try {
+         const response = await axios.post('http://localhost:3000/auth/login', {
+            email,
+            password,
+         });
+      
+         const { user, token } = response.data;
+      
+         await AsyncStorage.setItem('token', token);
+      
+         alert(`Welcome, ${user.username}`);
+         setIsLoggedIn(true);
+         } catch (error) {
+         console.error(error);
+         if (error.response?.status === 401) {
+            alert('Invalid email or password');
+         } else {
+            alert('Something went wrong. Please try again.');
+         }
+         }
+      };
 
    const handleClear = () => {
       setEmail('');
@@ -27,7 +49,7 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    return (
       <View style={styles.container}>
          <View style={styles.formContainer}>
-         <Text style={styles.title}>Sign in with email and password</Text>
+         <Text style={styles.title}>Sign in </Text>
          
          <Text style={styles.label}>Email</Text>
          <TextInput

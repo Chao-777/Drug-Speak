@@ -16,8 +16,8 @@ import LearningListScreen from './screens/LearningList';
 import LearningScreen from './screens/Learning';
 import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Updated SplashScreen with orange theme
 const SplashScreen = () => {
   const fadeAnim = new Animated.Value(1);
   
@@ -44,7 +44,7 @@ const SplashScreen = () => {
       }}
     >
       <View style={{
-        backgroundColor: Colors.primary, // '#FF7E33'
+        backgroundColor: Colors.primary, 
         borderRadius: 60,
         width: 120,
         height: 120,
@@ -61,13 +61,13 @@ const SplashScreen = () => {
       <Text style={{
         fontSize: 40,
         fontWeight: 'bold',
-        color: Colors.primary, // '#FF7E33'
+        color: Colors.primary, 
         marginBottom: 12,
       }}>Drug Speak</Text>
       <Text style={{
         fontSize: 18,
-        color: Colors.textPrimary, // '#333333'
-      }}>Your Medication Information Guide</Text>
+        color: Colors.textPrimary, 
+      }}>Your Medication Information Pal</Text>
     </Animated.View>
   );
 };
@@ -210,7 +210,6 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   );
 };
 
-// Profile Navigator with SignIn/SignUp screens
 const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
   return (
     <ProfileStack.Navigator
@@ -246,12 +245,12 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
           <ProfileStack.Screen 
             name="SignIn" 
             component={props => <SignInScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
-            options={{ title: 'Sign In' }}
+            options={{ title: '' }}
           />
           <ProfileStack.Screen 
             name="SignUp" 
             component={props => <SignUpScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
-            options={{ title: 'Sign Up' }}
+            options={{ title: '' }}
           />
         </>
       )}
@@ -261,7 +260,22 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('drugs');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedInState] = useState(false);
+
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      const savedLogin = await AsyncStorage.getItem('isLoggedIn');
+      if (savedLogin === 'true') {
+        setIsLoggedInState(true);
+      }
+    };
+    checkLoginStatus();
+  }, []);
+
+  const setIsLoggedIn = async (status) => {
+    setIsLoggedInState(status);
+    await AsyncStorage.setItem('isLoggedIn', status ? 'true' : 'false');
+  };
 
   const renderContent = () => {
     switch(activeTab) {
@@ -298,7 +312,6 @@ const MainApp = () => {
         );
       
       case 'learning':
-        // Only show learning content if logged in
         if (isLoggedIn) {
           return (
             <Stack.Navigator
@@ -328,7 +341,6 @@ const MainApp = () => {
             </Stack.Navigator>
           );
         } else {
-          // This should not happen with the alert in place, but as a fallback
           setActiveTab('drugs');
           return null;
         }
@@ -379,7 +391,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Hide splash screen after 4 seconds
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 4000);
