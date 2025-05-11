@@ -1,4 +1,3 @@
-// screens/DrugList.js
 import React, { useEffect, useState } from 'react';
 import { FlatList, SafeAreaView } from 'react-native';
 import { useSelector } from 'react-redux';

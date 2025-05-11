@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing } from '../constants/color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const [userName, setUserName] = useState('');
@@ -9,11 +11,35 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const [password, setPassword] = useState('');
    const [gender, setGender] = useState('');
 
-   const handleSignUp = () => {
-      if (userName && email && password && gender) {
-         setIsLoggedIn(true);
-      } else {
+   const handleSignUp = async () => {
+      if (!userName || !email || !password || !gender) {
          alert('Please fill in all fields');
+         return;
+      }
+   
+      try {
+         const response = await axios.post('http://localhost:3000/users', {
+            username: userName,
+            email,
+            password,
+            gender,
+         });
+   
+         if (response.data && response.data.token) {
+            alert('Signup successful!');
+            setIsLoggedIn(true);
+   
+            await AsyncStorage.setItem('token', response.data.token);
+         }
+      } catch (error) {
+         if (error.response && error.response.status === 409) {
+            alert('Email already in use.');
+         } else if (error.response && error.response.status === 400) {
+            alert('Invalid input. Please check all fields.');
+         } else {
+            alert('An error occurred during signup.');
+         }
+         console.error(error.response?.data || error.message);
       }
    };
 
@@ -31,7 +57,7 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    return (
       <View style={styles.container}>
          <View style={styles.formContainer}>
-         <Text style={styles.title}>Sign up a new user</Text>
+         <Text style={styles.title}>Sign up a New User</Text>
          
          <Text style={styles.label}>User Name</Text>
          <TextInput
