@@ -7,12 +7,11 @@ const DrugCard = ({ drug, isInLearningList, onPress }) => {
       return (
       <View
          style={{
-            backgroundColor: Colors.cardBackground,
-            padding: Spacing.lg,
-            marginVertical: Spacing.sm,
-            borderRadius: Borders.radius.medium,
-            ...Shadows.small,
-            opacity: 0.5 
+         backgroundColor: Colors.cardBackground,
+         padding: Spacing.lg,
+         marginVertical: Spacing.sm,
+         borderRadius: Borders.radius.medium,
+         ...Shadows.glassSmall 
          }}
       >
          <Text style={{
@@ -51,7 +50,7 @@ const DrugCard = ({ drug, isInLearningList, onPress }) => {
          padding: Spacing.lg,
          marginVertical: Spacing.sm,
          borderRadius: Borders.radius.medium,
-         ...Shadows.small
+         ...Shadows.glassSmall 
       }}
       onPress={onPress}
       >

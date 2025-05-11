@@ -1,80 +1,10 @@
 import React, { useState } from 'react';
+import { View, TouchableOpacity, Text } from 'react-native';
 import { Audio } from 'expo-av';
-import styled from 'styled-components/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import FAIcon from 'react-native-vector-icons/FontAwesome5';
-import { Colors, Spacing, Borders } from '../constants/color';
+import { Colors, Spacing, Typography, Borders, Shadows } from '../constants/color';
 import { drugAudioMap } from '../data/drugAudioMap';
-
-
-const CardContainer = styled.View`
-   flex-direction: row;
-   align-items: center;
-   padding-vertical: ${Spacing.md}px;
-   border-bottom-width: ${Borders.width.thin}px;
-   border-bottom-color: ${Colors.border};
-`;
-
-const PlayButton = styled.TouchableOpacity`
-   padding: ${Spacing.md}px;
-`;
-
-const DrugInfoContainer = styled.View`
-   flex: 1;
-   flex-direction: row;
-   align-items: center;
-`;
-
-const DrugName = styled.Text`
-   font-size: 16px;
-   margin-left: ${Spacing.sm}px;
-   color: ${Colors.textPrimary};
-`;
-
-const GenderIcon = styled(FAIcon)`
-   margin-left: ${Spacing.sm}px;
-`;
-
-const SpeedSelectorContainer = styled.View`
-   position: relative;
-   margin-left: ${Spacing.sm}px;
-`;
-
-const SpeedSelector = styled.TouchableOpacity`
-   flex-direction: row;
-   align-items: center;
-   border-width: ${Borders.width.thin}px;
-   border-color: ${Colors.border};
-   border-radius: ${Borders.radius.small}px;
-   padding: ${Spacing.xs}px;
-   margin-left: ${Spacing.xs}px;
-`;
-
-const SpeedText = styled.Text`
-   margin-right: ${Spacing.xs}px;
-   color: ${Colors.textSecondary};
-`;
-
-const SpeedDropdown = styled.View`
-   position: absolute;
-   top: 100%;
-   right: 0;
-   background-color: ${Colors.cardBackground};
-   border-width: ${Borders.width.thin}px;
-   border-color: ${Colors.border};
-   border-radius: ${Borders.radius.small}px;
-   z-index: 1000;
-`;
-
-const SpeedOption = styled.TouchableOpacity`
-   padding: ${Spacing.md}px;
-   border-bottom-width: ${Borders.width.thin}px;
-   border-bottom-color: ${Colors.border};
-`;
-
-const SpeedOptionText = styled.Text`
-   color: ${Colors.textPrimary};
-`;
 
 const PronunciationCard = ({ drugName, gender }) => {
    const [selectedSpeed, setSelectedSpeed] = useState('1.0');
@@ -85,8 +15,8 @@ const PronunciationCard = ({ drugName, gender }) => {
          const audioFile = drugAudioMap[drugName]?.audio?.[gender];
       
          if (!audioFile) {
-            console.warn(`Audio not found for ${drugName} - ${gender}`);
-            return;
+         console.warn(`Audio not found for ${drugName} - ${gender}`);
+         return;
          }
       
          const { sound } = await Audio.Sound.createAsync(audioFile, { shouldPlay: true });
@@ -97,43 +27,132 @@ const PronunciationCard = ({ drugName, gender }) => {
    };
 
    return (
-      <CardContainer>
-         <PlayButton onPress={() => playAudio(drugName, gender)}>
-            <Icon name="volume-up" size={24} color={Colors.textPrimary} />
-         </PlayButton> 
+      <View
+         style={{
+         flexDirection: 'row',
+         alignItems: 'center',
+         backgroundColor: Colors.cardBackground,
+         padding: Spacing.md,
+         marginVertical: Spacing.sm,
+         borderRadius: Borders.radius.medium,
+         borderBottomWidth: Borders.width.thin,
+         borderBottomColor: Colors.border,
+         ...Shadows.glassSmall,
+         zIndex: speedMenuOpen ? 10 : 1 // Increase z-index when dropdown is open
+         }}
+      >
+         <TouchableOpacity 
+         style={{
+            padding: Spacing.md,
+         }}
+         onPress={() => playAudio(drugName, gender)}
+         >
+         <Icon name="volume-up" size={24} color={Colors.primary} />
+         </TouchableOpacity>
 
-         <DrugInfoContainer>
-            <DrugName>{drugName}</DrugName>
-            <GenderIcon
-               name={gender === 'female' ? 'venus' : 'mars'}
-               size={20}
-               color={gender === 'female' ? '#d63384' : '#0d6efd'}
-            />
-         </DrugInfoContainer>
+         <View
+         style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+         }}
+         >
+         <Text
+            style={{
+               fontSize: Typography.sizes.body,
+               fontWeight: Typography.weights.medium,
+               color: Colors.textPrimary,
+               marginLeft: Spacing.sm,
+            }}
+         >
+            {drugName}
+         </Text>
+         
+         <FAIcon
+            name={gender === 'female' ? 'venus' : 'mars'}
+            size={20}
+            color={gender === 'female' ? Colors.female.text : Colors.male.text}
+            style={{ marginLeft: Spacing.sm }}
+         />
+         </View>
 
-         <SpeedSelectorContainer>
-            <SpeedSelector onPress={() => setSpeedMenuOpen(!speedMenuOpen)}>
-               <SpeedText>{selectedSpeed}</SpeedText>
-               <Icon name="arrow-drop-down" size={24} color={Colors.textSecondary} />
-            </SpeedSelector>
+         <View
+         style={{
+            position: 'relative',
+            marginLeft: Spacing.sm,
+            zIndex: 2 
+         }}
+         >
+         <TouchableOpacity
+            style={{
+               flexDirection: 'row',
+               alignItems: 'center',
+               borderWidth: Borders.width.thin,
+               borderColor: Colors.border,
+               borderRadius: Borders.radius.small,
+               padding: Spacing.xs,
+               marginLeft: Spacing.xs,
+               backgroundColor: 'white',
+            }}
+            onPress={() => setSpeedMenuOpen(!speedMenuOpen)}
+         >
+            <Text
+               style={{
+               marginRight: Spacing.xs,
+               color: Colors.textSecondary,
+               fontSize: Typography.sizes.small,
+               }}
+            >
+               {selectedSpeed}
+            </Text>
+            <Icon name="arrow-drop-down" size={24} color={Colors.textSecondary} />
+         </TouchableOpacity>
 
-            {speedMenuOpen && (
-               <SpeedDropdown>
-                  {['0.25', '0.5', '0.75', '1.0'].map((speed) => (
-                     <SpeedOption
-                        key={speed}
-                        onPress={() => {
-                           setSelectedSpeed(speed);
-                           setSpeedMenuOpen(false);
-                        }}
-                     >
-                        <SpeedOptionText>{speed}</SpeedOptionText>
-                     </SpeedOption>
-                  ))}
-               </SpeedDropdown>
-            )}
-         </SpeedSelectorContainer>
-      </CardContainer>
+         {speedMenuOpen && (
+            <View
+               style={{
+               position: 'absolute',
+               top: '100%',
+               right: 0,
+               backgroundColor: 'white',
+               borderWidth: Borders.width.thin,
+               borderColor: Colors.border,
+               borderRadius: Borders.radius.small,
+               zIndex: 1000, // Very high z-index
+               elevation: 5,   // For Android
+               ...Shadows.medium, // Stronger shadow for better visibility
+               width: 80, // Fixed width to ensure consistent appearance
+               }}
+            >
+               {['0.25', '0.5', '0.75', '1.0'].map((speed) => (
+               <TouchableOpacity
+                  key={speed}
+                  style={{
+                     padding: Spacing.md,
+                     borderBottomWidth: speed !== '1.0' ? Borders.width.thin : 0,
+                     borderBottomColor: Colors.border,
+                     backgroundColor: 'white',
+                     alignItems: 'center', // Center the text
+                  }}
+                  onPress={() => {
+                     setSelectedSpeed(speed);
+                     setSpeedMenuOpen(false);
+                  }}
+               >
+                  <Text
+                     style={{
+                     color: Colors.textPrimary,
+                     fontSize: Typography.sizes.small,
+                     }}
+                  >
+                     {speed}
+                  </Text>
+               </TouchableOpacity>
+               ))}
+            </View>
+         )}
+         </View>
+      </View>
    );
 };
 

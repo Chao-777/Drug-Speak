@@ -1,28 +1,28 @@
 import React from 'react';
-import styled from 'styled-components/native';
+import { View, Text } from 'react-native';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
-
-const HeaderContainer = styled.View`
-   background-color: ${Colors.secondary};
-   padding: ${Spacing.md}px;
-   align-items: center;
-   border-bottom-width: ${Borders.width.thin}px;
-   border-bottom-color: ${Colors.border};
-`;
-
-const HeaderTitle = styled.Text`
-   font-size: ${Typography.sizes.title}px;
-   font-weight: ${Typography.weights.bold};
-   color: ${Colors.textPrimary};
-`;
 
 const Header = ({ title }) => {
    return (
-      <HeaderContainer>
-         <HeaderTitle>
-            {title}
-         </HeaderTitle>
-      </HeaderContainer>
+      <View
+         style={{
+         backgroundColor: Colors.secondary,
+         padding: Spacing.md,
+         alignItems: 'center',
+         borderBottomWidth: Borders.width.thin,
+         borderBottomColor: Colors.border,
+         }}
+      >
+         <Text
+         style={{
+            fontSize: Typography.sizes.title,
+            fontWeight: Typography.weights.bold,
+            color: Colors.textPrimary,
+         }}
+         >
+         {title}
+         </Text>
+      </View>
    );
 };
 

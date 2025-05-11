@@ -1,33 +1,38 @@
 import React from 'react';
-import styled from 'styled-components/native';
-import { Colors, Spacing, Typography, Shadows, Borders } from '../constants/color';
-
-
-const CardContainer = styled.TouchableOpacity`
-   background-color: ${Colors.cardBackground};
-   padding: ${Spacing.lg}px;
-   margin-vertical: ${Spacing.sm}px;
-   border-radius: ${Borders.radius.medium}px;
-   shadow-color: ${Shadows.small.shadowColor};
-   shadow-offset: ${Shadows.small.shadowOffset.width}px ${Shadows.small.shadowOffset.height}px;
-   shadow-opacity: ${Shadows.small.shadowOpacity};
-   shadow-radius: ${Shadows.small.shadowRadius}px;
-   elevation: ${Shadows.small.elevation};
-`;
-
-
-const CardText = styled.Text`
-   font-size: ${Typography.sizes.body}px;
-   color: ${Colors.textPrimary};
-`;
+import { TouchableOpacity, Text, View } from 'react-native';
+import { Colors, Spacing, Typography, Borders, Shadows } from '../constants/color';
 
 const CategoryCard = ({ category, onPress }) => {
    return (
-      <CardContainer onPress={onPress}>
-         <CardText>
-            {category.name}({category.count})
-         </CardText>
-      </CardContainer>
+      <TouchableOpacity
+         style={{
+         backgroundColor: Colors.cardBackground,
+         padding: Spacing.lg,
+         marginVertical: Spacing.sm,
+         borderRadius: Borders.radius.medium,
+         ...Shadows.glassSmall 
+         }}
+         onPress={onPress}
+      >
+         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+         <Text style={{
+            fontSize: Typography.sizes.body,
+            fontWeight: Typography.weights.medium,
+            color: Colors.textPrimary
+         }}>
+            {category.name}
+         </Text>
+         
+         <Text style={{
+            fontSize: Typography.sizes.small,
+            fontWeight: Typography.weights.bold,
+            color: Colors.primary,
+            marginLeft: Spacing.xs
+         }}>
+            ({category.count})
+         </Text>
+         </View>
+      </TouchableOpacity>
    );
 };
 
