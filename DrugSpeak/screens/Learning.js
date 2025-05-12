@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useDispatch } from 'react-redux';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
 import PronunciationCard from '../components/PronunciationCard';
 import { removeFromLearningList } from '../store/learningListSlice';
@@ -30,7 +31,6 @@ const LearningScreen = ({ route, navigation }) => {
       navigation.goBack();
    };
 
-   // Function to toggle the dropdown state
    const handleToggleDropdown = (id) => {
       setOpenDropdownId(prev => prev === id ? null : id);
    };
@@ -111,86 +111,105 @@ const LearningScreen = ({ route, navigation }) => {
             </Text>
             {drug.sounds && drug.sounds.map((sound, index) => (
                <PronunciationCard 
-                  key={`${drug.id}_${sound.gender}`}
-                  id={`${drug.id}_${sound.gender}`} // Pass a unique ID for each card
-                  drugName={drug.name} 
-                  gender={sound.gender}
-                  audioFile={sound.file}
-                  isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
-                  onToggleDropdown={handleToggleDropdown}
+               key={`${drug.id}_${sound.gender}`}
+               id={`${drug.id}_${sound.gender}`}
+               drugName={drug.name} 
+               gender={sound.gender}
+               audioFile={sound.file}
+               isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
+               onToggleDropdown={handleToggleDropdown}
                />
             ))}
          </View>
 
-         <TouchableOpacity style={{
-            width: 120,
-            height: 120,
-            borderRadius: 60,
-            backgroundColor: Colors.primary,
-            justifyContent: 'center',
-            alignItems: 'center',
-            alignSelf: 'center',
-            marginVertical: Spacing.xl,
+         {/* Record Section */}
+         <View style={{
+            padding: Spacing.lg,
+            backgroundColor: Colors.cardBackground,
+            marginTop: Spacing.md,
+            borderTopWidth: Borders.width.thin,
+            borderTopColor: Colors.border,
          }}>
             <Text style={{
+               fontSize: Typography.sizes.subtitle,
+               fontWeight: Typography.weights.bold,
+               color: Colors.textPrimary,
+               marginBottom: Spacing.md,
+            }}>
+               Practice Pronunciation
+            </Text>
+            
+            <TouchableOpacity style={{
+               width: 120,
+               height: 120,
+               borderRadius: 60,
+               backgroundColor: '#000080', // Dark blue
+               justifyContent: 'center',
+               alignItems: 'center',
+               alignSelf: 'center',
+               marginBottom: Spacing.md,
+            }}>
+               <Text style={{
                color: 'white',
                fontWeight: Typography.weights.bold,
                fontSize: Typography.sizes.body,
                textAlign: 'center',
-            }}>
+               }}>
                Hold to Record
-            </Text>
-         </TouchableOpacity>
-
-         <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            padding: Spacing.lg,
-            marginBottom: Spacing.xxl,
-         }}>
-            <TouchableOpacity 
-            style={{
-               paddingVertical: Spacing.sm,  
-               paddingHorizontal: Spacing.sm,
-               borderRadius: Borders.radius.medium,
-               flex: 0.48,
-               alignItems: 'center',
-               backgroundColor: Colors.success,
-            }}
-            onPress={handleFinish}
-            >
-            <Text style={{
-               color: 'white',
-               fontWeight: Typography.weights.bold,
-               fontSize: Typography.sizes.body - 2,  
-            }}>
-               Finish
-            </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-            style={{
-               paddingVertical: Spacing.sm,  
-               paddingHorizontal: Spacing.sm,
-               borderRadius: Borders.radius.medium,
-               flex: 0.48,
-               alignItems: 'center',
-               backgroundColor: 'transparent',
-               borderWidth: 1,
-               borderColor: Colors.error,  
-            }}
-            onPress={handleRemove}
-            >
-            <Text style={{
-               color: Colors.error,  
-               fontWeight: Typography.weights.bold,
-               fontSize: Typography.sizes.body - 2,  
-            }}>
-               Remove
-            </Text>
+               </Text>
             </TouchableOpacity>
          </View>
          </ScrollView>
+         
+         {/* Fixed bottom navigation bar */}
+         <View style={{
+         flexDirection: 'row',
+         justifyContent: 'space-between',
+         borderTopWidth: 1,
+         borderTopColor: Colors.border,
+         paddingVertical: Spacing.sm,
+         paddingHorizontal: Spacing.lg,
+         backgroundColor: Colors.cardBackground,
+         }}>
+         <TouchableOpacity
+            style={{
+               flexDirection: 'row',
+               alignItems: 'center',
+            }}
+            onPress={handleRemove}
+         >
+            <Icon name="delete-outline" size={24} color={Colors.error} />
+            <Text style={{
+               marginLeft: Spacing.xs,
+               color: Colors.error,
+               fontSize: Typography.sizes.body,
+            }}>
+               Remove
+            </Text>
+         </TouchableOpacity>
+         
+         <TouchableOpacity
+            style={{
+               flexDirection: 'row',
+               alignItems: 'center',
+               backgroundColor: Colors.primary,
+               paddingVertical: Spacing.sm,
+               paddingHorizontal: Spacing.md,
+               borderRadius: Borders.radius.medium,
+            }}
+            onPress={handleFinish}
+         >
+            <Icon name="check" size={20} color="white" />
+            <Text style={{
+               marginLeft: Spacing.xs,
+               color: 'white',
+               fontWeight: Typography.weights.bold,
+               fontSize: Typography.sizes.body,
+            }}>
+               Finish
+            </Text>
+         </TouchableOpacity>
+         </View>
       </SafeAreaView>
    );
 };

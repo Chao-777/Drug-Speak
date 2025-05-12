@@ -1,41 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing } from '../constants/color';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import AuthService from '../api/authService';
 
 const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
+   const [loading, setLoading] = useState(false);
 
    const handleSignIn = async () => {
       if (!email || !password) {
          alert('Please enter both email and password');
          return;
-         }
+      }
       
-         try {
-         const response = await axios.post('http://localhost:3000/auth/login', {
-            email,
-            password,
-         });
-      
-         const { user, token } = response.data;
-      
-         await AsyncStorage.setItem('token', token);
-      
+      setLoading(true);
+      try {
+         const { user } = await AuthService.login(email, password);
          alert(`Welcome, ${user.username}`);
          setIsLoggedIn(true);
-         } catch (error) {
-         console.error(error);
-         if (error.response?.status === 401) {
-            alert('Invalid email or password');
-         } else {
-            alert('Something went wrong. Please try again.');
-         }
-         }
-      };
+      } catch (error) {
+         alert(error.message);
+      } finally {
+         setLoading(false);
+      }
+   };
 
    const handleClear = () => {
       setEmail('');
@@ -49,48 +39,68 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    return (
       <View style={styles.container}>
          <View style={styles.formContainer}>
-         <Text style={styles.title}>Sign in </Text>
-         
-         <Text style={styles.label}>Email</Text>
-         <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-         />
-         
-         <Text style={styles.label}>Password</Text>
-         <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-         />
-         
-         <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-               <Icon name="clear" size={16} color="white" />
-               <Text style={styles.buttonText}>Clear</Text>
-            </TouchableOpacity>
+            <Text style={styles.title}>Sign in</Text>
             
-            <TouchableOpacity style={styles.signInButton} onPress={handleSignIn}>
-               <Icon name="login" size={16} color="white" />
-               <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+               style={styles.input}
+               value={email}
+               onChangeText={setEmail}
+               placeholder="Enter your email"
+               keyboardType="email-address"
+               autoCapitalize="none"
+               editable={!loading}
+            />
+            
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+               style={styles.input}
+               value={password}
+               onChangeText={setPassword}
+               placeholder="Enter your password"
+               secureTextEntry
+               editable={!loading}
+            />
+            
+            <View style={styles.buttonContainer}>
+               <TouchableOpacity 
+                  style={[styles.clearButton, loading && styles.disabledButton]} 
+                  onPress={handleClear}
+                  disabled={loading}
+               >
+                  <Icon name="clear" size={16} color="white" />
+                  <Text style={styles.buttonText}>Clear</Text>
+               </TouchableOpacity>
+               
+               <TouchableOpacity 
+                  style={[styles.signInButton, loading && styles.disabledButton]} 
+                  onPress={handleSignIn}
+                  disabled={loading}
+               >
+                  {loading ? (
+                     <ActivityIndicator size="small" color="white" />
+                  ) : (
+                     <>
+                        <Icon name="login" size={16} color="white" />
+                        <Text style={styles.buttonText}>Sign In</Text>
+                     </>
+                  )}
+               </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+               style={styles.switchContainer} 
+               onPress={navigateToSignUp}
+               disabled={loading}
+            >
+               <Text style={styles.switchText}>New User? Sign up here! → </Text>
             </TouchableOpacity>
-         </View>
-         
-         <TouchableOpacity style={styles.switchContainer} onPress={navigateToSignUp}>
-            <Text style={styles.switchText}>New User? Sign up here! → </Text>
-         </TouchableOpacity>
          </View>
       </View>
    );
-   };
+};
 
-   const styles = StyleSheet.create({
+const styles = StyleSheet.create({
    container: {
       flex: 1,
       justifyContent: 'center',
@@ -148,6 +158,9 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
       padding: Spacing.md,
       borderRadius: 4,
       flex: 1,
+   },
+   disabledButton: {
+      opacity: 0.7,
    },
    buttonText: {
       color: 'white',
