@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing } from '../constants/color';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import AuthService from '../api/authService';
 
 const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const [userName, setUserName] = useState('');
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [gender, setGender] = useState('');
+   const [loading, setLoading] = useState(false);
 
    const handleSignUp = async () => {
       if (!userName || !email || !password || !gender) {
@@ -17,29 +17,21 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
          return;
       }
    
+      setLoading(true);
       try {
-         const response = await axios.post('http://localhost:3000/users', {
+         await AuthService.register({
             username: userName,
             email,
             password,
             gender,
          });
    
-         if (response.data && response.data.token) {
-            alert('Signup successful!');
-            setIsLoggedIn(true);
-   
-            await AsyncStorage.setItem('token', response.data.token);
-         }
+         alert('Signup successful!');
+         setIsLoggedIn(true);
       } catch (error) {
-         if (error.response && error.response.status === 409) {
-            alert('Email already in use.');
-         } else if (error.response && error.response.status === 400) {
-            alert('Invalid input. Please check all fields.');
-         } else {
-            alert('An error occurred during signup.');
-         }
-         console.error(error.response?.data || error.message);
+         alert(error.message);
+      } finally {
+         setLoading(false);
       }
    };
 
@@ -65,33 +57,38 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
             value={userName}
             onChangeText={setUserName}
             placeholder="Enter your name"
+            editable={!loading}
          />
          
          <Text style={styles.label}>Gender</Text>
          <View style={styles.genderContainer}>
             <TouchableOpacity
                style={[
-               styles.genderButton,
-               gender === 'male' && styles.genderButtonSelected
+                  styles.genderButton,
+                  gender === 'male' && styles.genderButtonSelected,
+                  loading && styles.disabledButton
                ]}
                onPress={() => setGender('male')}
+               disabled={loading}
             >
                <Text style={[
-               styles.genderButtonText,
-               gender === 'male' && styles.genderButtonTextSelected
+                  styles.genderButtonText,
+                  gender === 'male' && styles.genderButtonTextSelected
                ]}>Male</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
                style={[
-               styles.genderButton,
-               gender === 'female' && styles.genderButtonSelected
+                  styles.genderButton,
+                  gender === 'female' && styles.genderButtonSelected,
+                  loading && styles.disabledButton
                ]}
                onPress={() => setGender('female')}
+               disabled={loading}
             >
                <Text style={[
-               styles.genderButtonText,
-               gender === 'female' && styles.genderButtonTextSelected
+                  styles.genderButtonText,
+                  gender === 'female' && styles.genderButtonTextSelected
                ]}>Female</Text>
             </TouchableOpacity>
          </View>
@@ -104,6 +101,7 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!loading}
          />
          
          <Text style={styles.label}>Password</Text>
@@ -113,29 +111,48 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
             onChangeText={setPassword}
             placeholder="Create a password"
             secureTextEntry
+            editable={!loading}
          />
          
          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+            <TouchableOpacity 
+               style={[styles.clearButton, loading && styles.disabledButton]} 
+               onPress={handleClear}
+               disabled={loading}
+            >
                <Icon name="clear" size={16} color="white" />
                <Text style={styles.buttonText}>Clear</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
-               <Icon name="person-add" size={16} color="white" />
-               <Text style={styles.buttonText}>Sign Up</Text>
+            <TouchableOpacity 
+               style={[styles.signUpButton, loading && styles.disabledButton]} 
+               onPress={handleSignUp}
+               disabled={loading}
+            >
+               {loading ? (
+                  <ActivityIndicator size="small" color="white" />
+               ) : (
+                  <>
+                     <Icon name="person-add" size={16} color="white" />
+                     <Text style={styles.buttonText}>Sign Up</Text>
+                  </>
+               )}
             </TouchableOpacity>
          </View>
          
-         <TouchableOpacity style={styles.switchContainer} onPress={navigateToSignIn}>
+         <TouchableOpacity 
+            style={styles.switchContainer} 
+            onPress={navigateToSignIn}
+            disabled={loading}
+         >
             <Text style={styles.switchText}>Already have an account? Sign in here! →</Text>
          </TouchableOpacity>
          </View>
       </View>
    );
-   };
+};
 
-   const styles = StyleSheet.create({
+const styles = StyleSheet.create({
    container: {
       flex: 1,
       justifyContent: 'center',
@@ -220,6 +237,9 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
       padding: Spacing.md,
       borderRadius: 4,
       flex: 1,
+   },
+   disabledButton: {
+      opacity: 0.7,
    },
    buttonText: {
       color: 'white',
