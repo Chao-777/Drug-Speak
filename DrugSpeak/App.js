@@ -16,7 +16,9 @@ import LearningListScreen from './screens/LearningList';
 import LearningScreen from './screens/Learning';
 import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import UserProfileScreen from './screens/UserProfile';
+import EditProfileScreen from './screens/EditProfile';
+import AuthService from './api/authService';
 
 const SplashScreen = () => {
   const fadeAnim = new Animated.Value(1);
@@ -210,6 +212,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   );
 };
 
+
 const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
   return (
     <ProfileStack.Navigator
@@ -225,21 +228,21 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
       }}
     >
       {isLoggedIn ? (
-        <ProfileStack.Screen 
-          name="ProfileScreen" 
-          component={() => <PlaceholderScreen title="Profile" />}
-          options={{
-            title: 'My Profile',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => setIsLoggedIn(false)}
-                style={{ marginRight: 15 }}
-              >
-                <Text style={{ color: Colors.primary }}>Sign Out</Text>
-              </TouchableOpacity>
-            ),
-          }}
-        />
+        <>
+          <ProfileStack.Screen 
+            name="UserProfile" 
+            component={UserProfileScreen}
+            options={{
+              title: '',
+              // Removed the Sign Out button from header
+            }}
+          />
+          <ProfileStack.Screen 
+            name="EditProfile" 
+            component={EditProfileScreen}
+            options={{ title: 'Edit Profile' }}
+          />
+        </>
       ) : (
         <>
           <ProfileStack.Screen 
@@ -264,17 +267,20 @@ const MainApp = () => {
 
   useEffect(() => {
     const checkLoginStatus = async () => {
-      const savedLogin = await AsyncStorage.getItem('isLoggedIn');
-      if (savedLogin === 'true') {
-        setIsLoggedInState(true);
+      try {
+        const isAuthenticated = await AuthService.isLoggedIn();
+        setIsLoggedInState(isAuthenticated);
+      } catch (error) {
+        console.error('Error checking login status:', error);
+        setIsLoggedInState(false);
       }
     };
+    
     checkLoginStatus();
   }, []);
 
-  const setIsLoggedIn = async (status) => {
+  const setIsLoggedIn = (status) => {
     setIsLoggedInState(status);
-    await AsyncStorage.setItem('isLoggedIn', status ? 'true' : 'false');
   };
 
   const renderContent = () => {
