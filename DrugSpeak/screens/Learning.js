@@ -1,16 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
-import { useDispatch } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
 import PronunciationCard from '../components/PronunciationCard';
-import { removeFromLearningList } from '../store/learningListSlice';
+import { removeFromLearningList, updateLearningStatus } from '../store/learningListSlice';
 import { drugCategory } from '../data/resource';
+import RecordService from '../api/recordService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LearningScreen = ({ route, navigation }) => {
    const { drug } = route.params;
+   const learningList = useSelector(state => state.learningList.learningList || []);
    const dispatch = useDispatch();
    const [openDropdownId, setOpenDropdownId] = useState(null);
+   const [isLoading, setIsLoading] = useState(false);
+   const [studyStats, setStudyStats] = useState({
+      currentLearning: 0,
+      finishedLearning: 0,
+      totalScore: 0
+   });
+   const [userData, setUserData] = useState(null);
+
+   const currentLearning = learningList.filter(item => item.status === 'current');
+   const finishedLearning = learningList.filter(item => item.status === 'finished');
+
+   useEffect(() => {
+      const loadData = async () => {
+         try {
+            const userDataString = await AsyncStorage.getItem('userData');
+            if (userDataString) {
+               setUserData(JSON.parse(userDataString));
+               
+               const user = JSON.parse(userDataString);
+               
+               try {
+                  const record = await RecordService.getStudyRecordById(user.id);
+                  if (record) {
+                     setStudyStats({
+                        currentLearning: record.currentLearning || 0,
+                        finishedLearning: record.finishedLearning || 0,
+                        totalScore: record.totalScore || 0
+                     });
+                  }
+               } catch (error) {
+                  if (error.message === "Study record not found for this user." || 
+                        (error.response && error.response.status === 404)) {
+                     
+                     console.log("No study record found. Creating a new one...");
+                     
+                     const newStats = {
+                        currentLearning: currentLearning.length,
+                        finishedLearning: finishedLearning.length,
+                        totalScore: 0
+                     };
+                     
+                     await RecordService.upsertStudyRecord(newStats);
+                     setStudyStats(newStats);
+                  } else {
+                     console.error('Error fetching study record:', error);
+                  }
+               }
+            }
+         } catch (error) {
+            console.error('Error loading data:', error);
+         }
+      };
+      
+      loadData();
+   }, []);
 
    const getCategoryNames = (categoryIds) => {
       if (!categoryIds || !Array.isArray(categoryIds)) return '';
@@ -21,19 +79,101 @@ const LearningScreen = ({ route, navigation }) => {
       }).join(', ');
    };
 
-   const handleFinish = () => {
-      console.log(`Marking ${drug.name} as finished`);
-      navigation.goBack();
+   const handleFinish = async () => {
+      try {
+         setIsLoading(true);
+         
+         dispatch(updateLearningStatus({ id: drug.id, status: 'finished' }));
+         
+         if (!userData) {
+            const userDataString = await AsyncStorage.getItem('userData');
+            if (userDataString) {
+               setUserData(JSON.parse(userDataString));
+            } else {
+               throw new Error('User data not found. Please log in again.');
+            }
+         }
+         
+         const updatedCurrentLearning = learningList.filter(
+            item => item.id !== drug.id && item.status === 'current'
+         ).length;
+         
+         const updatedFinishedLearning = learningList.filter(
+            item => (item.id === drug.id || item.status === 'finished')
+         ).length;
+         
+         const newStats = {
+            currentLearning: updatedCurrentLearning,
+            finishedLearning: updatedFinishedLearning,
+            totalScore: studyStats.totalScore + 10 
+         };
+         
+         await RecordService.upsertStudyRecord(newStats);
+         
+         setStudyStats(newStats);
+         
+         Alert.alert(
+            "Success",
+            `${drug.name} marked as finished!`,
+            [{ text: "OK", onPress: () => navigation.goBack() }]
+         );
+      } catch (error) {
+         console.error('Error updating study record:', error);
+         Alert.alert(
+            "Error",
+            error.message || "Failed to update study record",
+            [{ text: "OK" }]
+         );
+      } finally {
+         setIsLoading(false);
+      }
    };
 
-   const handleRemove = () => {
-      dispatch(removeFromLearningList(drug.id));
-      navigation.goBack();
+   const handleRemove = async () => {
+      try {
+         setIsLoading(true);
+         
+         const isCurrentDrug = drug.status === 'current';
+         const isFinishedDrug = drug.status === 'finished';
+         
+         dispatch(removeFromLearningList(drug.id));
+         
+         if (!userData) {
+            const userDataString = await AsyncStorage.getItem('userData');
+            if (userDataString) {
+               setUserData(JSON.parse(userDataString));
+            } else {
+               navigation.goBack();
+               return;
+            }
+         }
+         
+         const newStats = {
+            currentLearning: isCurrentDrug ? 
+               Math.max(0, studyStats.currentLearning - 1) : 
+               studyStats.currentLearning,
+            finishedLearning: isFinishedDrug ? 
+               Math.max(0, studyStats.finishedLearning - 1) : 
+               studyStats.finishedLearning,
+            totalScore: studyStats.totalScore 
+         };
+         
+
+         await RecordService.upsertStudyRecord(newStats);
+         
+         navigation.goBack();
+      } catch (error) {
+         console.error('Error updating study record:', error);
+         navigation.goBack();
+      } finally {
+         setIsLoading(false);
+      }
    };
 
    const handleToggleDropdown = (id) => {
       setOpenDropdownId(prev => prev === id ? null : id);
    };
+
 
    return (
       <SafeAreaView style={{
@@ -122,7 +262,6 @@ const LearningScreen = ({ route, navigation }) => {
             ))}
          </View>
 
-         {/* Record Section */}
          <View style={{
             padding: Spacing.lg,
             backgroundColor: Colors.cardBackground,
@@ -143,7 +282,7 @@ const LearningScreen = ({ route, navigation }) => {
                width: 120,
                height: 120,
                borderRadius: 60,
-               backgroundColor: '#000080', // Dark blue
+               backgroundColor: '#000080', 
                justifyContent: 'center',
                alignItems: 'center',
                alignSelf: 'center',
@@ -161,7 +300,6 @@ const LearningScreen = ({ route, navigation }) => {
          </View>
          </ScrollView>
          
-         {/* Fixed bottom navigation bar */}
          <View style={{
          flexDirection: 'row',
          justifyContent: 'space-between',
@@ -177,11 +315,12 @@ const LearningScreen = ({ route, navigation }) => {
                alignItems: 'center',
             }}
             onPress={handleRemove}
+            disabled={isLoading}
          >
-            <Icon name="delete-outline" size={24} color={Colors.error} />
+            <Icon name="delete-outline" size={24} color={isLoading ? Colors.textLight : Colors.error} />
             <Text style={{
                marginLeft: Spacing.xs,
-               color: Colors.error,
+               color: isLoading ? Colors.textLight : Colors.error,
                fontSize: Typography.sizes.body,
             }}>
                Remove
@@ -192,12 +331,13 @@ const LearningScreen = ({ route, navigation }) => {
             style={{
                flexDirection: 'row',
                alignItems: 'center',
-               backgroundColor: Colors.primary,
+               backgroundColor: isLoading ? Colors.textLight : Colors.primary,
                paddingVertical: Spacing.sm,
                paddingHorizontal: Spacing.md,
                borderRadius: Borders.radius.medium,
             }}
             onPress={handleFinish}
+            disabled={isLoading}
          >
             <Icon name="check" size={20} color="white" />
             <Text style={{
@@ -206,7 +346,7 @@ const LearningScreen = ({ route, navigation }) => {
                fontWeight: Typography.weights.bold,
                fontSize: Typography.sizes.body,
             }}>
-               Finish
+               {isLoading ? "Updating..." : "Finish"}
             </Text>
          </TouchableOpacity>
          </View>

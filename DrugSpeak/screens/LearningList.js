@@ -1,18 +1,110 @@
-import React, { useState } from 'react';
-import { FlatList, View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { FlatList, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders, Shadows } from '../constants/color';
+import RecordService from '../api/recordService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
    const dispatch = useDispatch();
+   
+   const [loading, setLoading] = useState(false);
+   const [refreshing, setRefreshing] = useState(false);
+   const [error, setError] = useState(null);
+   const [studyStats, setStudyStats] = useState({
+      currentLearning: 0,
+      finishedLearning: 0,
+      totalScore: 0
+   });
    
    const currentLearning = learningList.filter(drug => drug.status === 'current');
    const finishedLearning = learningList.filter(drug => drug.status === 'finished');
    
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
+
+   const fetchStudyRecord = async () => {
+      try {
+         setLoading(true);
+         setError(null);
+         
+         const userDataString = await AsyncStorage.getItem('userData');
+         if (!userDataString) {
+            console.warn('No user data available to fetch study record');
+            setLoading(false);
+            setRefreshing(false);
+            return;
+         }
+         
+         const userData = JSON.parse(userDataString);
+         
+         try {
+            const studyRecord = await RecordService.getStudyRecordById(userData.id);
+            
+            setStudyStats({
+               currentLearning: studyRecord.currentLearning || 0,
+               finishedLearning: studyRecord.finishedLearning || 0,
+               totalScore: studyRecord.totalScore || 0
+            });
+         } catch (error) {
+            if (error.message === "Study record not found for this user." || 
+                  (error.response && error.response.status === 404)) {
+               
+               console.log("No study record found. Creating a new one...");
+               
+               const newStats = {
+                  currentLearning: currentLearning.length,
+                  finishedLearning: finishedLearning.length,
+                  totalScore: 0 
+               };
+               
+               await RecordService.upsertStudyRecord(newStats);
+               setStudyStats(newStats);
+            } else {
+               throw error;
+            }
+         }
+      } catch (error) {
+         console.error('Error fetching/creating study record:', error);
+         setError(error.message || 'Failed to fetch study record');
+      } finally {
+         setLoading(false);
+         setRefreshing(false);
+      }
+   };
+
+   const syncWithBackend = async (currentCount, finishedCount) => {
+      try {
+         const updatedStats = {
+            currentLearning: currentCount,
+            finishedLearning: finishedCount,
+            totalScore: studyStats.totalScore
+         };
+         
+         await RecordService.upsertStudyRecord(updatedStats);
+         
+         setStudyStats(updatedStats);
+      } catch (error) {
+         console.error('Error syncing with backend:', error);
+      }
+   };
+
+   useEffect(() => {
+      fetchStudyRecord();
+      
+      const unsubscribe = navigation.addListener('focus', () => {
+         fetchStudyRecord();
+      });
+      
+      return unsubscribe;
+   }, [navigation]);
+
+   const onRefresh = () => {
+      setRefreshing(true);
+      fetchStudyRecord();
+   };
 
    const renderDrugItem = ({ item }) => (
       <TouchableOpacity 
@@ -21,7 +113,7 @@ const LearningListScreen = ({ navigation }) => {
          padding: Spacing.lg,
          marginVertical: Spacing.sm,
          borderRadius: Borders.radius.medium,
-         ...Shadows.glassSmall // Using the glass shadow effect from CategoryCard
+         ...Shadows.glassSmall
          }}
          onPress={() => navigation.navigate('LearningScreen', { drug: item })}
          activeOpacity={0.7}
@@ -59,7 +151,6 @@ const LearningListScreen = ({ navigation }) => {
       </TouchableOpacity>
    );
 
-   // Simple section header component
    const SectionHeader = ({ title, count, isExpanded, onToggle }) => (
       <TouchableOpacity 
          style={{
@@ -102,7 +193,6 @@ const LearningListScreen = ({ navigation }) => {
       </TouchableOpacity>
    );
 
-   // Empty state component
    const EmptyState = () => (
       <View style={{
          flex: 1,
@@ -127,50 +217,176 @@ const LearningListScreen = ({ navigation }) => {
       </View>
    );
 
+   const ErrorState = ({ message, onRetry }) => (
+      <View style={{
+         flex: 1,
+         justifyContent: 'center',
+         alignItems: 'center',
+         padding: Spacing.xl,
+      }}>
+         <Icon 
+            name="error-outline" 
+            size={60} 
+            color={Colors.error} 
+            style={{ marginBottom: Spacing.lg }}
+         />
+         <Text style={{
+            fontSize: Typography.sizes.subtitle,
+            color: Colors.textSecondary,
+            textAlign: 'center',
+            marginBottom: Spacing.lg,
+         }}>
+            {message || 'Something went wrong'}
+         </Text>
+         <TouchableOpacity
+            style={{
+               backgroundColor: Colors.primary,
+               paddingVertical: Spacing.sm,
+               paddingHorizontal: Spacing.lg,
+               borderRadius: Borders.radius.medium,
+            }}
+            onPress={onRetry}
+         >
+            <Text style={{ color: 'white', fontWeight: Typography.weights.bold }}>
+               Retry
+            </Text>
+         </TouchableOpacity>
+      </View>
+   );
+
+   const StatsBar = () => (
+      <View style={{
+         flexDirection: 'row',
+         justifyContent: 'space-around',
+         backgroundColor: Colors.cardBackground,
+         padding: Spacing.md,
+         marginBottom: Spacing.md,
+         borderBottomWidth: 1,
+         borderBottomColor: Colors.border,
+      }}>
+         <View style={{ alignItems: 'center' }}>
+            <Text style={{ 
+               fontSize: Typography.sizes.small, 
+               color: Colors.textSecondary 
+            }}>
+               Current
+            </Text>
+            <Text style={{ 
+               fontSize: Typography.sizes.title, 
+               fontWeight: Typography.weights.bold, 
+               color: Colors.primary 
+            }}>
+               {studyStats.currentLearning}
+            </Text>
+         </View>
+         
+         <View style={{ alignItems: 'center' }}>
+            <Text style={{ 
+               fontSize: Typography.sizes.small, 
+               color: Colors.textSecondary 
+            }}>
+               Finished
+            </Text>
+            <Text style={{ 
+               fontSize: Typography.sizes.title, 
+               fontWeight: Typography.weights.bold, 
+               color: Colors.success 
+            }}>
+               {studyStats.finishedLearning}
+            </Text>
+         </View>
+         
+         <View style={{ alignItems: 'center' }}>
+            <Text style={{ 
+               fontSize: Typography.sizes.small, 
+               color: Colors.textSecondary 
+            }}>
+               Score
+            </Text>
+            <Text style={{ 
+               fontSize: Typography.sizes.title, 
+               fontWeight: Typography.weights.bold, 
+               color: Colors.warning 
+            }}>
+               {studyStats.totalScore}
+            </Text>
+         </View>
+      </View>
+   );
+
+   if (loading && !refreshing) {
+      return (
+         <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={{ marginTop: Spacing.md, color: Colors.textSecondary }}>
+               Loading your study progress...
+            </Text>
+         </SafeAreaView>
+      );
+   }
+
+   if (error && !refreshing) {
+      return (
+         <SafeAreaView style={{ flex: 1 }}>
+            <ErrorState 
+               message={error} 
+               onRetry={fetchStudyRecord} 
+            />
+         </SafeAreaView>
+      );
+   }
+
    return (
       <SafeAreaView style={{
          flex: 1,
          backgroundColor: Colors.background,
       }}>
          {learningList.length === 0 ? (
-         <EmptyState />
+            <EmptyState />
          ) : (
-         <FlatList
-            data={[]} 
-            ListHeaderComponent={() => (
-               <View style={{ paddingBottom: 100 }}>
-               {/* Current Learning Section */}
-               <SectionHeader 
-                  title="Current Learning" 
-                  count={currentLearning.length}
-                  isExpanded={currentExpanded}
-                  onToggle={() => setCurrentExpanded(!currentExpanded)}
-               />
-               
-               {currentExpanded && currentLearning.map(item => (
-                  <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                     {renderDrugItem({ item })}
+            <FlatList
+               data={[]} 
+               ListHeaderComponent={() => (
+                  <View style={{ paddingBottom: 100 }}>
+                     <StatsBar />
+                     
+                     <SectionHeader 
+                        title="Current Learning" 
+                        count={currentLearning.length}
+                        isExpanded={currentExpanded}
+                        onToggle={() => setCurrentExpanded(!currentExpanded)}
+                     />
+                     
+                     {currentExpanded && currentLearning.map(item => (
+                        <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
+                           {renderDrugItem({ item })}
+                        </View>
+                     ))}
+                     
+                     <SectionHeader 
+                        title="Finished" 
+                        count={finishedLearning.length}
+                        isExpanded={finishedExpanded}
+                        onToggle={() => setFinishedExpanded(!finishedExpanded)}
+                     />
+                     
+                     {finishedExpanded && finishedLearning.map(item => (
+                        <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
+                           {renderDrugItem({ item })}
+                        </View>
+                     ))}
                   </View>
-               ))}
-               
-               {/* Finished Learning Section */}
-               <SectionHeader 
-                  title="Finished" 
-                  count={finishedLearning.length}
-                  isExpanded={finishedExpanded}
-                  onToggle={() => setFinishedExpanded(!finishedExpanded)}
-               />
-               
-               {finishedExpanded && finishedLearning.map(item => (
-                  <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                     {renderDrugItem({ item })}
-                  </View>
-               ))}
-               </View>
-            )}
-            renderItem={() => null}
-            keyExtractor={(item) => item.id}
-         />
+               )}
+               renderItem={() => null}
+               keyExtractor={(item) => item.id}
+               refreshControl={
+                  <RefreshControl
+                     refreshing={refreshing}
+                     onRefresh={onRefresh}
+                     colors={[Colors.primary]}
+                  />
+               }
+            />
          )}
       </SafeAreaView>
    );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text, Animated, StyleSheet, Alert } from 'react-native';
+import { View, TouchableOpacity, Text, Animated, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider } from 'react-redux';
@@ -234,7 +234,6 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
             component={UserProfileScreen}
             options={{
               title: '',
-              // Removed the Sign Out button from header
             }}
           />
           <ProfileStack.Screen 
