@@ -39,7 +39,7 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    return (
       <View style={styles.container}>
          <View style={styles.formContainer}>
-            <Text style={styles.title}>Sign in</Text>
+            <Text style={styles.title}>Sign in  with your email and password</Text>
             
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -82,7 +82,7 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
                   ) : (
                      <>
                         <Icon name="login" size={16} color="white" />
-                        <Text style={styles.buttonText}>Sign In</Text>
+                        <Text style={styles.buttonText}>Sign in</Text>
                      </>
                   )}
                </TouchableOpacity>

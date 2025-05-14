@@ -17,7 +17,6 @@ import LearningScreen from './screens/Learning';
 import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
 import UserProfileScreen from './screens/UserProfile';
-import EditProfileScreen from './screens/EditProfile';
 import AuthService from './api/authService';
 
 const SplashScreen = () => {
@@ -231,15 +230,10 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
         <>
           <ProfileStack.Screen 
             name="UserProfile" 
-            component={UserProfileScreen}
+            component={props => <UserProfileScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
             options={{
               title: '',
             }}
-          />
-          <ProfileStack.Screen 
-            name="EditProfile" 
-            component={EditProfileScreen}
-            options={{ title: 'Edit Profile' }}
           />
         </>
       ) : (

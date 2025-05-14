@@ -73,18 +73,20 @@ const AuthService = {
     */
    logout: async () => {
       try {
-         // Call logout endpoint (if your API requires it)
-         await apiClient.post('/auth/logout');
-         
-         // Remove token and user data from storage
+         // Skip the API call since the endpoint doesn't exist
+         // and directly clear the local storage
          await AsyncStorage.removeItem('userToken');
          await AsyncStorage.removeItem('userData');
          return true;
       } catch (error) {
          console.error('Logout error:', error);
-         // Even if API call fails, clear token and user data locally
-         await AsyncStorage.removeItem('userToken');
-         await AsyncStorage.removeItem('userData');
+         // Try again in case of error
+         try {
+            await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.removeItem('userData');
+         } catch (secondError) {
+            console.error('Failed to clear storage:', secondError);
+         }
          return false;
       }
    },

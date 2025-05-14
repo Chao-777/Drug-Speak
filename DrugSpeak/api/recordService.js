@@ -41,12 +41,33 @@ const RecordService = {
          console.error('Error fetching study record:', error);
          
          if (error.response?.status === 404) {
-         throw new Error('Study record not found for this user.');
+         return {
+            userId: userId,
+            currentLearning: 0,
+            finishedLearning: 0,
+            totalScore: 0,
+            isDefaultRecord: true
+         };
          } else if (error.response?.status === 401) {
          throw new Error('You need to be logged in to view this record.');
          } else {
          throw new Error('Failed to fetch study record. Please try again.');
          }
+      }
+   },
+
+   createStudyRecord: async (userId, data) => {
+      try {
+         const recordData = {
+         ...data,
+         userId
+         };
+         
+         const response = await apiClient.post('/study-record', recordData);
+         return response.data;
+      } catch (error) {
+         console.error('Error creating study record:', error);
+         throw new Error('Failed to create study record. Please try again.');
       }
    }
 };

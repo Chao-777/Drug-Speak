@@ -274,7 +274,7 @@ const LearningListScreen = ({ navigation }) => {
             <Text style={{ 
                fontSize: Typography.sizes.title, 
                fontWeight: Typography.weights.bold, 
-               color: Colors.primary 
+               color: Typography.primary 
             }}>
                {studyStats.currentLearning}
             </Text>
