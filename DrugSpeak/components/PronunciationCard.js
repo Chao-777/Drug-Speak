@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -8,23 +8,82 @@ import { drugAudioMap } from '../data/drugAudioMap';
 
 const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, onToggleDropdown }) => {
    const [selectedSpeed, setSelectedSpeed] = useState('1.0');
+   const [sound, setSound] = useState(null);
+   const [isPlaying, setIsPlaying] = useState(false);
+   const [isLoading, setIsLoading] = useState(false);
    
    const DROPDOWN_WIDTH = 80;
 
+   useEffect(() => {
+      return () => {
+         if (sound) {
+            sound.unloadAsync();
+         }
+      };
+   }, [sound]);
+
    const playAudio = async (drugName, gender) => {
       try {
+         setIsLoading(true);
+         
+         if (sound) {
+            await sound.stopAsync();
+            await sound.unloadAsync();
+            setSound(null);
+         }
+         
          const audioFile = drugAudioMap[drugName]?.audio?.[gender];
       
          if (!audioFile) {
             console.warn(`Audio not found for ${drugName} - ${gender}`);
+            setIsLoading(false);
             return;
          }
-      
-         const { sound } = await Audio.Sound.createAsync(audioFile, { shouldPlay: true });
-         await sound.playAsync();
+         
+         const { sound: newSound } = await Audio.Sound.createAsync(
+            audioFile,
+            { shouldPlay: false }
+         );
+         
+         setSound(newSound);
+         
+         const speedValue = parseFloat(selectedSpeed);
+         await newSound.setRateAsync(speedValue, true);
+         
+         newSound.setOnPlaybackStatusUpdate((status) => {
+            if (status.didJustFinish) {
+               setIsPlaying(false);
+            }
+         });
+         
+         await newSound.playAsync();
+         setIsPlaying(true);
+         
       } catch (error) {
          console.error('Error playing audio:', error);
+      } finally {
+         setIsLoading(false);
       }
+   };
+   
+   const stopAudio = async () => {
+      if (sound) {
+         await sound.stopAsync();
+         setIsPlaying(false);
+      }
+   };
+   
+   const handleSpeedChange = async (speed) => {
+      setSelectedSpeed(speed);
+      
+      if (sound && isPlaying) {
+         const speedValue = parseFloat(speed);
+         await sound.stopAsync();
+         await sound.setRateAsync(speedValue, true);
+         await sound.playAsync();
+      }
+      
+      onToggleDropdown(null);
    };
 
    return (
@@ -43,12 +102,16 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
          }}
       >
          <TouchableOpacity 
-            style={{
-               padding: Spacing.md,
-            }}
-            onPress={() => playAudio(drugName, gender)}
+            onPress={isPlaying ? stopAudio : () => playAudio(drugName, gender)}
+            disabled={isLoading}
          >
-            <Icon name="volume-up" size={24} color={Colors.primary} />
+            {isLoading ? (
+               <Icon name="hourglass-empty" size={24} color={Colors.textLight} />
+            ) : isPlaying ? (
+               <Icon name="stop" size={24} color={Colors.error} />
+            ) : (
+               <Icon name="volume-up" size={24} color={Colors.primary} />
+            )}
          </TouchableOpacity>
 
          <View
@@ -106,7 +169,7 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
                      fontSize: Typography.sizes.small,
                   }}
                >
-                  {selectedSpeed}
+                  {selectedSpeed}x
                </Text>
                <Icon name="arrow-drop-down" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -127,28 +190,26 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
                      width: DROPDOWN_WIDTH, 
                   }}
                >
-                  {['0.25', '0.5', '0.75', '1.0'].map((speed) => (
+                  {['0.25', '0.5', '0.75', '1.0', '1.25', '1.5', '2.0'].map((speed) => (
                      <TouchableOpacity
                         key={speed}
                         style={{
                            padding: Spacing.md,
-                           borderBottomWidth: speed !== '1.0' ? Borders.width.thin : 0,
+                           borderBottomWidth: speed !== '2.0' ? Borders.width.thin : 0,
                            borderBottomColor: Colors.border,
-                           backgroundColor: 'white',
+                           backgroundColor: selectedSpeed === speed ? Colors.primaryLight : 'white',
                            alignItems: 'center', 
                         }}
-                        onPress={() => {
-                           setSelectedSpeed(speed);
-                           onToggleDropdown(null); 
-                        }}
+                        onPress={() => handleSpeedChange(speed)}
                      >
                         <Text
                            style={{
-                              color: Colors.textPrimary,
+                              color: selectedSpeed === speed ? Colors.textPrimary : Colors.textPrimary,
+                              fontWeight: selectedSpeed === speed ? Typography.weights.bold : Typography.weights.regular,
                               fontSize: Typography.sizes.small,
                            }}
                         >
-                           {speed}
+                           {speed}x
                         </Text>
                      </TouchableOpacity>
                   ))}

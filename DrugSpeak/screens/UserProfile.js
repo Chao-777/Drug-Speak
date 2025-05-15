@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing, Borders } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
 import RecordService from '../api/recordService';
 import { useSelector } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
@@ -23,9 +25,44 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [confirmPassword, setConfirmPassword] = useState('');
    const [updateLoading, setUpdateLoading] = useState(false);
    
+   // Get learning list counts from Redux
    const learningList = useSelector(state => state.learningList.learningList || []);
    const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
    const finishedLearningCount = learningList.filter(drug => drug.status === 'finished').length;
+
+   // Effect to sync stats when list counts change
+   useEffect(() => {
+      const syncStats = async () => {
+         // Only update if stats are different from redux counts
+         if (studyStats.currentLearning !== currentLearningCount || 
+            studyStats.finishedLearning !== finishedLearningCount) {
+            
+            // Only try to update if user is logged in
+            const userDataString = await AsyncStorage.getItem('userData');
+            if (userDataString) {
+               const userData = JSON.parse(userDataString);
+               
+               if (userData && userData.id) {
+                  const newStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: studyStats.totalScore // Maintain the score
+                  };
+                  
+                  try {
+                     await RecordService.upsertStudyRecord(newStats);
+                     setStudyStats(newStats);
+                     console.log('User profile stats synced with Redux state:', newStats);
+                  } catch (error) {
+                     console.error('Error syncing stats from Redux state:', error);
+                  }
+               }
+            }
+         }
+      };
+      
+      syncStats();
+   }, [currentLearningCount, finishedLearningCount]);
 
    useEffect(() => {
       const unsubscribe = navigation.addListener('focus', () => {
@@ -45,35 +82,65 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          setUsername(userData?.username || '');
          
          if (userData && userData.id) {
-            const record = await RecordService.getStudyRecordById(userData.id);
-            
-            if (record.isDefaultRecord) {
-               const newStats = {
-               currentLearning: currentLearningCount,
-               finishedLearning: finishedLearningCount,
-               totalScore: 0
+            try {
+               const record = await RecordService.getStudyRecordById(userData.id);
+               
+               // Check if the remote stats differ from local Redux counts
+               const remoteStats = {
+                  currentLearning: record.currentLearning || 0,
+                  finishedLearning: record.finishedLearning || 0,
+                  totalScore: record.totalScore || 0
                };
                
-               try {
-               await RecordService.upsertStudyRecord(newStats);
-               } catch (createError) {
-               console.log('Error creating new record, will use default stats:', createError);
+               // If local counts differ from remote, update remote
+               if (remoteStats.currentLearning !== currentLearningCount || 
+                  remoteStats.finishedLearning !== finishedLearningCount) {
+                  
+                  const updatedStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: remoteStats.totalScore // Keep the score
+                  };
+                  
+                  // Update the backend with correct counts
+                  await RecordService.upsertStudyRecord(updatedStats);
+                  setStudyStats(updatedStats);
+                  console.log('Remote stats updated with Redux counts:', updatedStats);
+               } else {
+                  // Remote stats match Redux counts, use them
+                  setStudyStats(remoteStats);
+               }
+            } catch (error) {
+               // If record doesn't exist, create a new one with Redux counts
+               if (error.message === "Study record not found for this user." || 
+                  (error.response && error.response.status === 404)) {
+                  
+                  console.log("No study record found. Creating a new one...");
+                  
+                  const newStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: 0
+                  };
+                  
+                  try {
+                     await RecordService.upsertStudyRecord(newStats);
+                     setStudyStats(newStats);
+                  } catch (createError) {
+                     console.log('Error creating new record, will use default stats:', createError);
+                  }
+               } else {
+                  throw error;
                }
             }
-            
-            setStudyStats({
-               currentLearning: record.currentLearning || 0,
-               finishedLearning: record.finishedLearning || 0,
-               totalScore: record.totalScore || 0
-            });
          }
-         } catch (error) {
+      } catch (error) {
          setError(error.message || 'Failed to load profile');
          Alert.alert('Error', error.message || 'Failed to load profile');
-         } finally {
+      } finally {
          setLoading(false);
-         }
-      };
+      }
+   };
 
    const handleUpdate = () => {
       setShowEditModal(true);
@@ -164,7 +231,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    }
 
    return (
-      <View style={styles.container}>
+      <ScrollView style={styles.container}>
          <View style={styles.header}>
             <Text style={styles.headerTitle}>User Profile</Text>
          </View>
@@ -191,12 +258,12 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             
             <View style={styles.statsGrid}>
                <View style={styles.statItem}>
-                  <Text style={styles.statValueCurrent}>{studyStats.currentLearning}</Text>
+                  <Text style={styles.statValueCurrent}>{currentLearningCount}</Text>
                   <Text style={styles.statLabel}>Current Learning</Text>
                </View>
                
                <View style={styles.statItem}>
-                  <Text style={styles.statValueFinished}>{studyStats.finishedLearning}</Text>
+                  <Text style={styles.statValueFinished}>{finishedLearningCount}</Text>
                   <Text style={styles.statLabel}>Finished</Text>
                </View>
                
@@ -299,7 +366,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                </View>
             </View>
          </Modal>
-      </View>
+      </ScrollView>
    );
 };
 

@@ -3,10 +3,11 @@ import { View, TouchableOpacity, Text, Animated, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { store } from './store';
+import { store, persistor } from './store';
 import { Colors, Typography, Spacing } from './constants/color';
 import { useSelector } from 'react-redux';
 import CategoriesScreen from './screens/DrugCategories';
@@ -18,6 +19,8 @@ import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
 import UserProfileScreen from './screens/UserProfile';
 import AuthService from './api/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const SplashScreen = () => {
   const fadeAnim = new Animated.Value(1);
@@ -89,7 +92,35 @@ const ProfileStack = createStackNavigator();
 
 export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   const learningList = useSelector(state => state.learningList.learningList || []);
-  const learningCount = learningList.length;
+  const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
+  
+  const [recordingsBadge, setRecordingsBadge] = useState(0);
+  
+  useEffect(() => {
+    const loadRecordingCounts = async () => {
+      try {
+        if (!isLoggedIn) return;
+        
+        let totalRecordings = 0;
+        
+        for (const drug of learningList.filter(d => d.status === 'current')) {
+          const storageKey = `recordings_${drug.id}`;
+          const savedRecordings = await AsyncStorage.getItem(storageKey);
+          
+          if (savedRecordings) {
+            const recordings = JSON.parse(savedRecordings);
+            totalRecordings += recordings.length;
+          }
+        }
+        
+        setRecordingsBadge(totalRecordings > 0 ? totalRecordings : 0);
+      } catch (error) {
+        console.error('Error loading recording counts for badge:', error);
+      }
+    };
+    
+    loadRecordingCounts();
+  }, [isLoggedIn, learningList]);
   
   const handleLearningPress = () => {
     if (!isLoggedIn) {
@@ -144,7 +175,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
         <View style={{ position: 'relative' }}>
           <Icon name="school" size={24} color={activeTab === 'learning' ? Colors.primary : Colors.textSecondary} />
           
-          {isLoggedIn && learningCount > 0 && (
+          {isLoggedIn && currentLearningCount > 0 && (
             <View style={{
               position: 'absolute',
               top: -8,
@@ -162,7 +193,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
                 color: 'white',
                 fontWeight: 'bold',
               }}>
-                {learningCount}
+                {currentLearningCount}
               </Text>
             </View>
           )}
@@ -399,16 +430,18 @@ export default function App() {
 
   return (
     <Provider store={store}>
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        {isLoading ? (
-          <SplashScreen />
-        ) : (
-          <NavigationContainer>
-            <MainApp />
-          </NavigationContainer>
-        )}
-      </SafeAreaProvider>
+      <PersistGate loading={null} persistor={persistor}>
+        <SafeAreaProvider>
+          <StatusBar style="auto" />
+          {isLoading ? (
+            <SplashScreen />
+          ) : (
+            <NavigationContainer>
+              <MainApp />
+            </NavigationContainer>
+          )}
+        </SafeAreaProvider>
+      </PersistGate>
     </Provider>
   );
 }

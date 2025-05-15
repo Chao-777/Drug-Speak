@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders, Shadows } from '../constants/color';
 import RecordService from '../api/recordService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateLearningStatus, removeFromLearningList } from '../store/learningListSlice';
 
 const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
@@ -25,6 +26,36 @@ const LearningListScreen = ({ navigation }) => {
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
 
+   // Force sync stats with local counts
+   useEffect(() => {
+      // This effect will run when currentLearning or finishedLearning change
+      const syncStats = async () => {
+         if (studyStats.currentLearning !== currentLearning.length || 
+             studyStats.finishedLearning !== finishedLearning.length) {
+            
+            // Only update if user is logged in
+            const userDataString = await AsyncStorage.getItem('userData');
+            if (userDataString) {
+               const newStats = {
+                  currentLearning: currentLearning.length,
+                  finishedLearning: finishedLearning.length,
+                  totalScore: studyStats.totalScore // Keep the existing score
+               };
+               
+               try {
+                  await RecordService.upsertStudyRecord(newStats);
+                  setStudyStats(newStats);
+                  console.log('Stats synced with local counts:', newStats);
+               } catch (error) {
+                  console.error('Error syncing stats with local counts:', error);
+               }
+            }
+         }
+      };
+      
+      syncStats();
+   }, [currentLearning.length, finishedLearning.length]);
+
    const fetchStudyRecord = async () => {
       try {
          setLoading(true);
@@ -43,11 +74,30 @@ const LearningListScreen = ({ navigation }) => {
          try {
             const studyRecord = await RecordService.getStudyRecordById(userData.id);
             
-            setStudyStats({
+            // If remote counts don't match local counts, prioritize local counts
+            const remoteStats = {
                currentLearning: studyRecord.currentLearning || 0,
                finishedLearning: studyRecord.finishedLearning || 0,
                totalScore: studyRecord.totalScore || 0
-            });
+            };
+            
+            if (remoteStats.currentLearning !== currentLearning.length || 
+                remoteStats.finishedLearning !== finishedLearning.length) {
+               
+               // Update backend with local counts
+               const updatedStats = {
+                  currentLearning: currentLearning.length,
+                  finishedLearning: finishedLearning.length,
+                  totalScore: remoteStats.totalScore // Keep the score
+               };
+               
+               await RecordService.upsertStudyRecord(updatedStats);
+               setStudyStats(updatedStats);
+               console.log('Remote stats updated with local counts:', updatedStats);
+            } else {
+               // Remote stats match local counts, use them
+               setStudyStats(remoteStats);
+            }
          } catch (error) {
             if (error.message === "Study record not found for this user." || 
                   (error.response && error.response.status === 404)) {
@@ -75,19 +125,85 @@ const LearningListScreen = ({ navigation }) => {
       }
    };
 
-   const syncWithBackend = async (currentCount, finishedCount) => {
+   const handleReviewDrug = async (drug) => {
       try {
+         // Move drug from Finished to Current Learning list
+         dispatch(updateLearningStatus({ id: drug.id, status: 'current' }));
+         
+         // Update stats
          const updatedStats = {
-            currentLearning: currentCount,
-            finishedLearning: finishedCount,
+            currentLearning: studyStats.currentLearning + 1,
+            finishedLearning: studyStats.finishedLearning - 1,
             totalScore: studyStats.totalScore
          };
          
+         // Update backend
          await RecordService.upsertStudyRecord(updatedStats);
          
+         // Update local state
          setStudyStats(updatedStats);
+         
+         // Show confirmation
+         Alert.alert(
+            "Moved to Current Learning",
+            `${drug.name} has been moved back to your Current Learning list.`,
+            [{ text: "OK" }]
+         );
       } catch (error) {
-         console.error('Error syncing with backend:', error);
+         console.error('Error moving drug to current learning:', error);
+         Alert.alert(
+            "Error",
+            "Failed to move drug to Current Learning list. Please try again.",
+            [{ text: "OK" }]
+         );
+      }
+   };
+
+   const handleRemoveDrug = async (drug) => {
+      try {
+         // Ask for confirmation
+         Alert.alert(
+            "Remove Drug",
+            `Are you sure you want to remove ${drug.name} from your ${drug.status === 'finished' ? 'Finished' : 'Learning'} list?`,
+            [
+               { 
+                  text: "Cancel", 
+                  style: "cancel" 
+               },
+               {
+                  text: "Remove",
+                  style: "destructive",
+                  onPress: async () => {
+                     // Remove drug from learning list
+                     dispatch(removeFromLearningList(drug.id));
+                     
+                     // Update stats based on which list it was in
+                     const updatedStats = {
+                        currentLearning: drug.status === 'current' ? 
+                           Math.max(0, studyStats.currentLearning - 1) : 
+                           studyStats.currentLearning,
+                        finishedLearning: drug.status === 'finished' ? 
+                           Math.max(0, studyStats.finishedLearning - 1) : 
+                           studyStats.finishedLearning,
+                        totalScore: studyStats.totalScore
+                     };
+                     
+                     // Update backend
+                     await RecordService.upsertStudyRecord(updatedStats);
+                     
+                     // Update local state
+                     setStudyStats(updatedStats);
+                  }
+               }
+            ]
+         );
+      } catch (error) {
+         console.error('Error removing drug:', error);
+         Alert.alert(
+            "Error",
+            "Failed to remove drug from list. Please try again.",
+            [{ text: "OK" }]
+         );
       }
    };
 
@@ -106,49 +222,148 @@ const LearningListScreen = ({ navigation }) => {
       fetchStudyRecord();
    };
 
-   const renderDrugItem = ({ item }) => (
+   const renderCurrentDrugItem = ({ item }) => (
       <TouchableOpacity 
          style={{
-         backgroundColor: Colors.cardBackground,
-         padding: Spacing.lg,
-         marginVertical: Spacing.sm,
-         borderRadius: Borders.radius.medium,
-         ...Shadows.glassSmall
+            backgroundColor: Colors.cardBackground,
+            padding: Spacing.lg,
+            marginVertical: Spacing.sm,
+            borderRadius: Borders.radius.medium,
+            ...Shadows.glassSmall
          }}
          onPress={() => navigation.navigate('LearningScreen', { drug: item })}
          activeOpacity={0.7}
       >
          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-         <View style={{ flex: 1 }}>
-            <Text style={{
-               fontSize: Typography.sizes.body,
-               fontWeight: Typography.weights.medium,
-               color: Colors.textPrimary
-            }}>
-               {item.name}
-            </Text>
-            
-            {item.other_names && item.other_names.length > 0 && (
+            <View style={{ flex: 1 }}>
                <Text style={{
-               fontSize: Typography.sizes.small,
-               color: Colors.textSecondary,
-               marginTop: Spacing.xs
+                  fontSize: Typography.sizes.body,
+                  fontWeight: Typography.weights.medium,
+                  color: Colors.textPrimary
                }}>
-               {item.other_names.join(', ')}
+                  {item.name}
                </Text>
-            )}
-         </View>
-         
-         <Text style={{
-            fontSize: Typography.sizes.small,
-            fontWeight: Typography.weights.bold,
-            color: Colors.primary,
-            marginLeft: Spacing.xs
-         }}>
-            {item.molecular_formula}
-         </Text>
+               
+               {item.other_names && item.other_names.length > 0 && (
+                  <Text style={{
+                     fontSize: Typography.sizes.small,
+                     color: Colors.textSecondary,
+                     marginTop: Spacing.xs
+                  }}>
+                     {item.other_names.join(', ')}
+                  </Text>
+               )}
+            </View>
+            
+            <Text style={{
+               fontSize: Typography.sizes.small,
+               fontWeight: Typography.weights.bold,
+               color: Colors.primary,
+               marginLeft: Spacing.xs
+            }}>
+               {item.molecular_formula}
+            </Text>
          </View>
       </TouchableOpacity>
+   );
+
+   const renderFinishedDrugItem = ({ item }) => (
+      <View
+         style={{
+            backgroundColor: Colors.cardBackground,
+            padding: Spacing.lg,
+            marginVertical: Spacing.sm,
+            borderRadius: Borders.radius.medium,
+            ...Shadows.glassSmall
+         }}
+      >
+         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
+            <View style={{ flex: 1 }}>
+               <Text style={{
+                  fontSize: Typography.sizes.body,
+                  fontWeight: Typography.weights.medium,
+                  color: Colors.textPrimary
+               }}>
+                  {item.name}
+               </Text>
+               
+               {item.other_names && item.other_names.length > 0 && (
+                  <Text style={{
+                     fontSize: Typography.sizes.small,
+                     color: Colors.textSecondary,
+                     marginTop: Spacing.xs
+                  }}>
+                     {item.other_names.join(', ')}
+                  </Text>
+               )}
+            </View>
+            
+            <Text style={{
+               fontSize: Typography.sizes.small,
+               fontWeight: Typography.weights.bold,
+               color: Colors.primary,
+               marginLeft: Spacing.xs
+            }}>
+               {item.molecular_formula}
+            </Text>
+         </View>
+
+
+         <View style={{ 
+            flexDirection: 'row', 
+            justifyContent: 'space-between',
+            marginTop: Spacing.sm,
+            borderTopWidth: 1,
+            borderTopColor: Colors.border,
+            paddingTop: Spacing.sm
+         }}>
+            <TouchableOpacity
+               style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: Colors.primary,
+                  paddingVertical: Spacing.xs,
+                  paddingHorizontal: Spacing.sm,
+                  borderRadius: Borders.radius.small,
+               }}
+               onPress={() => handleReviewDrug(item)}
+            >
+               <Icon name="refresh" size={16} color="white" />
+               <Text style={{
+                  color: 'white',
+                  fontWeight: Typography.weights.medium,
+                  fontSize: Typography.sizes.small,
+                  marginLeft: Spacing.xs
+               }}>
+                  Review
+               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+               style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: Colors.cardBackground,
+                  borderColor: Colors.error,
+                  borderWidth: 1,
+                  paddingVertical: Spacing.xs,
+                  paddingHorizontal: Spacing.sm,
+                  borderRadius: Borders.radius.small,
+               }}
+               onPress={() => handleRemoveDrug(item)}
+            >
+               <Icon name="delete-outline" size={16} color={Colors.error} />
+               <Text style={{
+                  color: Colors.error,
+                  fontWeight: Typography.weights.medium,
+                  fontSize: Typography.sizes.small,
+                  marginLeft: Spacing.xs
+               }}>
+                  Remove
+               </Text>
+            </TouchableOpacity>
+         </View>
+      </View>
    );
 
    const SectionHeader = ({ title, count, isExpanded, onToggle }) => (
@@ -274,9 +489,9 @@ const LearningListScreen = ({ navigation }) => {
             <Text style={{ 
                fontSize: Typography.sizes.title, 
                fontWeight: Typography.weights.bold, 
-               color: Typography.primary 
+               color: Colors.textPrimary
             }}>
-               {studyStats.currentLearning}
+               {currentLearning.length}
             </Text>
          </View>
          
@@ -292,7 +507,7 @@ const LearningListScreen = ({ navigation }) => {
                fontWeight: Typography.weights.bold, 
                color: Colors.success 
             }}>
-               {studyStats.finishedLearning}
+               {finishedLearning.length}
             </Text>
          </View>
          
@@ -359,7 +574,7 @@ const LearningListScreen = ({ navigation }) => {
                      
                      {currentExpanded && currentLearning.map(item => (
                         <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                           {renderDrugItem({ item })}
+                           {renderCurrentDrugItem({ item })}
                         </View>
                      ))}
                      
@@ -372,7 +587,7 @@ const LearningListScreen = ({ navigation }) => {
                      
                      {finishedExpanded && finishedLearning.map(item => (
                         <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                           {renderDrugItem({ item })}
+                           {renderFinishedDrugItem({ item })}
                         </View>
                      ))}
                   </View>
