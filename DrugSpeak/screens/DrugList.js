@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, SafeAreaView } from 'react-native';
+import { SafeAreaView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { getDrugsByCategory, categoryArray } from '../data/drugs';
 import DrugCard from '../components/DrugCard';
 import Header from '../components/Header';
-import { Colors, Spacing } from '../constants/color';
+import ReusableFlatList from '../components/ReusableFlatlist';
+import { Colors } from '../constants/color';
 
 const DrugListScreen = ({ route, navigation }) => {
    const { categoryId } = route.params;
@@ -18,8 +19,8 @@ const DrugListScreen = ({ route, navigation }) => {
       setCategoryName(name);
       
       navigation.setOptions({ 
-      title: '',
-      headerBackTitle: 'Drugs in Category'
+         title: '',
+         headerBackTitle: 'Drugs in Category'
       });
       
       const drugsInCategory = getDrugsByCategory(categoryId);
@@ -30,30 +31,25 @@ const DrugListScreen = ({ route, navigation }) => {
       const isInLearningList = learningList.some(drug => drug.id === item.id);
       
       return (
-      <DrugCard 
-         drug={item}
-         isInLearningList={isInLearningList}
-         onPress={() => navigation.navigate('DrugDetail', { drugId: item.id })}
-      />
+         <DrugCard 
+            drug={item}
+            isInLearningList={isInLearningList}
+            onPress={() => navigation.navigate('DrugDetail', { drugId: item.id })}
+         />
       );
    };
 
    return (
       <SafeAreaView style={{
-      flex: 1,
-      backgroundColor: Colors.background
+         flex: 1,
+         backgroundColor: Colors.background
       }}>
-      <Header title={categoryName} />
-      <FlatList
-         data={drugs}
-         renderItem={renderDrugItem}
-         keyExtractor={(item) => item.id}
-         contentContainerStyle={{
-            padding: Spacing.md,
-            paddingBottom: Spacing.xxl
-         }}
-         showsVerticalScrollIndicator={true}
-      />
+         <Header title={categoryName} />
+         <ReusableFlatList
+            data={drugs}
+            renderItem={renderDrugItem}
+            keyExtractor={(item) => item.id}
+         />
       </SafeAreaView>
    );
 };

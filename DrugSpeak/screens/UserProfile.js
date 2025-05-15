@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, ScrollView } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Typography, Spacing, Borders } from '../constants/color';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Colors, Spacing, Borders } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
 import RecordService from '../api/recordService';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { PrimaryButton, SecondaryButton } from '../components/Button';
+import LoadingIndicator from '../components/LoadingIndicator';
+import ErrorState from '../components/ErrorState';
+import FormInput from '../components/FormInput';
+import { SectionHeader } from '../components/SectionHeader';
+import ContentSection from '../components/ContentSection';
+import StatsBar from '../components/StatsBar';
+import Header from '../components/Header';
+import LabeledText from '../components/LabeledText';
+import FormModal from '../components/FormModal';
 
 const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
@@ -25,19 +33,15 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [confirmPassword, setConfirmPassword] = useState('');
    const [updateLoading, setUpdateLoading] = useState(false);
    
-   // Get learning list counts from Redux
    const learningList = useSelector(state => state.learningList.learningList || []);
    const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
    const finishedLearningCount = learningList.filter(drug => drug.status === 'finished').length;
 
-   // Effect to sync stats when list counts change
    useEffect(() => {
       const syncStats = async () => {
-         // Only update if stats are different from redux counts
          if (studyStats.currentLearning !== currentLearningCount || 
             studyStats.finishedLearning !== finishedLearningCount) {
             
-            // Only try to update if user is logged in
             const userDataString = await AsyncStorage.getItem('userData');
             if (userDataString) {
                const userData = JSON.parse(userDataString);
@@ -46,13 +50,12 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                   const newStats = {
                      currentLearning: currentLearningCount,
                      finishedLearning: finishedLearningCount,
-                     totalScore: studyStats.totalScore // Maintain the score
+                     totalScore: studyStats.totalScore
                   };
                   
                   try {
                      await RecordService.upsertStudyRecord(newStats);
                      setStudyStats(newStats);
-                     console.log('User profile stats synced with Redux state:', newStats);
                   } catch (error) {
                      console.error('Error syncing stats from Redux state:', error);
                   }
@@ -85,37 +88,29 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             try {
                const record = await RecordService.getStudyRecordById(userData.id);
                
-               // Check if the remote stats differ from local Redux counts
                const remoteStats = {
                   currentLearning: record.currentLearning || 0,
                   finishedLearning: record.finishedLearning || 0,
                   totalScore: record.totalScore || 0
                };
                
-               // If local counts differ from remote, update remote
                if (remoteStats.currentLearning !== currentLearningCount || 
                   remoteStats.finishedLearning !== finishedLearningCount) {
                   
                   const updatedStats = {
                      currentLearning: currentLearningCount,
                      finishedLearning: finishedLearningCount,
-                     totalScore: remoteStats.totalScore // Keep the score
+                     totalScore: remoteStats.totalScore
                   };
                   
-                  // Update the backend with correct counts
                   await RecordService.upsertStudyRecord(updatedStats);
                   setStudyStats(updatedStats);
-                  console.log('Remote stats updated with Redux counts:', updatedStats);
                } else {
-                  // Remote stats match Redux counts, use them
                   setStudyStats(remoteStats);
                }
             } catch (error) {
-               // If record doesn't exist, create a new one with Redux counts
                if (error.message === "Study record not found for this user." || 
                   (error.response && error.response.status === 404)) {
-                  
-                  console.log("No study record found. Creating a new one...");
                   
                   const newStats = {
                      currentLearning: currentLearningCount,
@@ -191,6 +186,13 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          setUpdateLoading(false);
       }
    };
+
+   const handleCloseModal = () => {
+      setShowEditModal(false);
+      setPassword('');
+      setConfirmPassword('');
+      setUsername(user?.username || '');
+   };
    
    const handleSignOut = async () => {
       try {
@@ -199,7 +201,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          if (setIsLoggedIn) {
             setIsLoggedIn(false);
          }
-         
       } catch (error) {
          console.error('Error signing out:', error);
          Alert.alert('Error', 'Failed to sign out. Please try again.');
@@ -207,165 +208,97 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    };
 
    if (loading) {
-      return (
-         <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Loading profile...</Text>
-         </View>
-      );
+      return <LoadingIndicator message="Loading profile..." />;
    }
 
    if (error) {
-      return (
-         <View style={styles.errorContainer}>
-            <Icon name="error-outline" size={50} color={Colors.error} />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity 
-               style={styles.retryButton}
-               onPress={loadUserProfile}
-            >
-               <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-         </View>
-      );
+      return <ErrorState message={error} onRetry={loadUserProfile} />;
    }
 
    return (
       <ScrollView style={styles.container}>
-         <View style={styles.header}>
-            <Text style={styles.headerTitle}>User Profile</Text>
-         </View>
+         <Header title="User Profile" />
          
-         <View style={styles.profileContainer}>
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>User Name:</Text>
-               <Text style={styles.value}>{user?.username || 'N/A'}</Text>
-            </View>
+         <ContentSection>
+            <LabeledText 
+               label="User Name" 
+               value={user?.username || 'N/A'} 
+               style={styles.infoRow}
+            />
             
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>Email:</Text>
-               <Text style={styles.value}>{user?.email || 'N/A'}</Text>
-            </View>
+            <LabeledText 
+               label="Email" 
+               value={user?.email || 'N/A'} 
+               style={styles.infoRow}
+            />
             
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>Gender:</Text>
-               <Text style={styles.value}>{user?.gender || 'N/A'}</Text>
-            </View>
-         </View>
+            <LabeledText 
+               label="Gender" 
+               value={user?.gender || 'N/A'} 
+               style={styles.infoRow}
+            />
+         </ContentSection>
          
-         <View style={styles.statsContainer}>
-            <Text style={styles.sectionTitle}>Study Statistics</Text>
+         <ContentSection>
+            <SectionHeader title="Study Statistics" />
             
-            <View style={styles.statsGrid}>
-               <View style={styles.statItem}>
-                  <Text style={styles.statValueCurrent}>{currentLearningCount}</Text>
-                  <Text style={styles.statLabel}>Current Learning</Text>
-               </View>
-               
-               <View style={styles.statItem}>
-                  <Text style={styles.statValueFinished}>{finishedLearningCount}</Text>
-                  <Text style={styles.statLabel}>Finished</Text>
-               </View>
-               
-               <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{studyStats.totalScore}</Text>
-                  <Text style={styles.statLabel}>Total Score</Text>
-               </View>
-            </View>
-         </View>
+            <StatsBar 
+               currentCount={currentLearningCount}
+               finishedCount={finishedLearningCount}
+               totalScore={studyStats.totalScore}
+               style={styles.statsBar}
+            />
+         </ContentSection>
          
          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-               style={styles.updateButton}
+            <PrimaryButton 
+               title="Update"
+               icon="edit"
                onPress={handleUpdate}
-            >
-               <Icon name="edit" size={18} color="white" />
-               <Text style={styles.buttonText}>Update</Text>
-            </TouchableOpacity>
+               style={styles.actionButton}
+            />
             
-            <TouchableOpacity 
-               style={styles.signOutButton}
+            <SecondaryButton 
+               title="Sign Out"
+               icon="logout"
                onPress={handleSignOut}
-            >
-               <Icon name="logout" size={18} color="white" />
-               <Text style={styles.buttonText}>Sign Out</Text>
-            </TouchableOpacity>
+               style={styles.actionButton}
+            />
          </View>
          
-         <Modal
+         <FormModal
             visible={showEditModal}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowEditModal(false)}
+            onClose={handleCloseModal}
+            onSubmit={handleUpdateSubmit}
+            title="Update Profile"
+            isLoading={updateLoading}
          >
-            <View style={styles.modalContainer}>
-               <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Update Profile</Text>
-                  
-                  <View style={styles.inputGroup}>
-                     <Text style={styles.inputLabel}>Username</Text>
-                     <TextInput
-                        style={styles.input}
-                        value={username}
-                        onChangeText={setUsername}
-                        placeholder="Enter username"
-                        editable={!updateLoading}
-                     />
-                  </View>
-                  
-                  <View style={styles.inputGroup}>
-                     <Text style={styles.inputLabel}>New Password (optional)</Text>
-                     <TextInput
-                        style={styles.input}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="Enter new password"
-                        secureTextEntry
-                        editable={!updateLoading}
-                     />
-                  </View>
-                  
-                  <View style={styles.inputGroup}>
-                     <Text style={styles.inputLabel}>Confirm Password</Text>
-                     <TextInput
-                        style={styles.input}
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        placeholder="Confirm new password"
-                        secureTextEntry
-                        editable={!updateLoading}
-                     />
-                  </View>
-                  
-                  <View style={styles.modalButtons}>
-                     <TouchableOpacity 
-                        style={styles.cancelModalButton}
-                        onPress={() => {
-                           setShowEditModal(false);
-                           setPassword('');
-                           setConfirmPassword('');
-                           setUsername(user?.username || '');
-                        }}
-                        disabled={updateLoading}
-                     >
-                        <Text style={styles.cancelModalButtonText}>Cancel</Text>
-                     </TouchableOpacity>
-                     
-                     <TouchableOpacity 
-                        style={[styles.confirmButton, updateLoading && styles.disabledButton]}
-                        onPress={handleUpdateSubmit}
-                        disabled={updateLoading}
-                     >
-                        {updateLoading ? (
-                           <ActivityIndicator size="small" color="white" />
-                        ) : (
-                           <Text style={styles.confirmButtonText}>Confirm</Text>
-                        )}
-                     </TouchableOpacity>
-                  </View>
-               </View>
-            </View>
-         </Modal>
+            <FormInput
+               label="Username"
+               value={username}
+               onChangeText={setUsername}
+               placeholder="Enter username"
+               editable={!updateLoading}
+            />
+            
+            <FormInput
+               label="New Password (optional)"
+               value={password}
+               onChangeText={setPassword}
+               placeholder="Enter new password"
+               secureTextEntry
+               editable={!updateLoading}
+            />
+            
+            <FormInput
+               label="Confirm Password"
+               value={confirmPassword}
+               onChangeText={setConfirmPassword}
+               placeholder="Confirm new password"
+               secureTextEntry
+               editable={!updateLoading}
+            />
+         </FormModal>
       </ScrollView>
    );
 };
@@ -375,122 +308,11 @@ const styles = StyleSheet.create({
       flex: 1,
       backgroundColor: Colors.background,
    },
-   loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: Colors.background,
-   },
-   loadingText: {
-      marginTop: Spacing.md,
-      fontSize: Typography.sizes.body,
-      color: Colors.textPrimary,
-   },
-   errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: Colors.background,
-      padding: Spacing.lg,
-   },
-   errorText: {
-      marginTop: Spacing.md,
-      fontSize: Typography.sizes.body,
-      color: Colors.error,
-      textAlign: 'center',
-      marginBottom: Spacing.lg,
-   },
-   retryButton: {
-      backgroundColor: Colors.primary,
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-   },
-   retryButtonText: {
-      color: 'white',
-      fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-   },
-   header: {
-      padding: Spacing.md,
-      alignItems: 'center',
-      borderBottomWidth: 1,
-      borderBottomColor: Colors.border,
-   },
-   headerTitle: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary,
-   },
-   profileContainer: {
-      padding: Spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: Colors.border,
-   },
    infoRow: {
       flexDirection: 'row',
       paddingVertical: Spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: Colors.border,
-   },
-   label: {
-      flex: 1,
-      fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-      color: Colors.textPrimary,
-   },
-   value: {
-      flex: 1,
-      fontSize: Typography.sizes.body,
-      color: Colors.textSecondary,
-      textAlign: 'right',
-   },
-   statsContainer: {
-      padding: Spacing.lg,
-   },
-   sectionTitle: {
-      fontSize: Typography.sizes.subtitle,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary,
-      marginBottom: Spacing.md,
-   },
-   statsGrid: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      borderWidth: 1,
-      borderColor: Colors.border,
-      borderRadius: Borders.radius.medium,
-      overflow: 'hidden',
-   },
-   statItem: {
-      flex: 1,
-      padding: Spacing.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRightWidth: 1,
-      borderRightColor: Colors.border,
-      backgroundColor: Colors.cardBackground,
-   },
-   statValue: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Colors.primary,
-   },
-   statValueCurrent: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary, 
-   },
-   statValueFinished: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Colors.success, 
-   },
-   statLabel: {
-      fontSize: Typography.sizes.small,
-      color: Colors.textSecondary,
-      marginTop: Spacing.xs,
-      textAlign: 'center',
    },
    buttonContainer: {
       flexDirection: 'row',
@@ -498,101 +320,10 @@ const styles = StyleSheet.create({
       padding: Spacing.lg,
       marginTop: Spacing.lg,
    },
-   updateButton: {
-      backgroundColor: Colors.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-      minWidth: 120,
-   },
-   signOutButton: {
-      backgroundColor: 'darkblue',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-      minWidth: 120,
-   },
-   buttonText: {
-      color: 'white',
-      fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-      marginLeft: Spacing.xs,
-   },
-   modalContainer: {
+   actionButton: {
+      marginHorizontal: Spacing.sm,
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-   },
-   modalContent: {
-      backgroundColor: 'white',
-      borderRadius: Borders.radius.medium,
-      padding: Spacing.lg,
-      width: '85%',
-   },
-   modalTitle: {
-      fontSize: Typography.sizes.subtitle,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary,
-      marginBottom: Spacing.lg,
-      textAlign: 'center',
-   },
-   inputGroup: {
-      marginBottom: Spacing.md,
-   },
-   inputLabel: {
-      fontSize: Typography.sizes.body,
-      color: Colors.textPrimary,
-      marginBottom: Spacing.xs,
-   },
-   input: {
-      backgroundColor: Colors.cardBackground,
-      borderRadius: Borders.radius.small,
-      padding: Spacing.md,
-      fontSize: Typography.sizes.body,
-      borderWidth: 1,
-      borderColor: Colors.border,
-   },
-   modalButtons: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: Spacing.lg,
-   },
-   confirmButton: {
-      backgroundColor: Colors.primary,
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.small,
-      flex: 1,
-      alignItems: 'center',
-      marginLeft: Spacing.sm,
-   },
-   cancelModalButton: {
-      backgroundColor: 'darkblue',
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.small,
-      flex: 1,
-      alignItems: 'center',
-      marginRight: Spacing.sm,
-   },
-   confirmButtonText: {
-      color: 'white',
-      fontWeight: Typography.weights.medium,
-   },
-   cancelModalButtonText: {
-      color: 'white',
-      fontWeight: Typography.weights.medium,
-   },
-   disabledButton: {
-      opacity: 0.7,
-   },
+   }
 });
 
 export default UserProfileScreen;

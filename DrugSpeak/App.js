@@ -21,23 +21,36 @@ import UserProfileScreen from './screens/UserProfile';
 import AuthService from './api/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import LoadingIndicator from './components/LoadingIndicator';
+import EmptyState from './components/EmptyState';
 
-// Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 const PlaceholderScreen = ({ title }) => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
-    <Text style={{ fontSize: Typography.sizes.heading, color: Colors.textPrimary }}>
-      {title} Screen
-    </Text>
-    <Text style={{ fontSize: Typography.sizes.body, color: Colors.textSecondary, marginTop: Spacing.md }}>
-      This section is coming soon
-    </Text>
+  <View style={{ flex: 1, backgroundColor: Colors.background }}>
+    <EmptyState 
+      icon="construction"
+      message={`${title} Screen is coming soon`}
+      iconColor={Colors.textLight}
+    />
   </View>
 );
 
 const Stack = createStackNavigator();
 const ProfileStack = createStackNavigator();
+
+// Define common header styles for all navigators
+const headerOptions = {
+  headerStyle: {
+    backgroundColor: 'white', // Changed to white background
+  },
+  headerTintColor: Colors.textPrimary, // Changed to primary text color
+  headerTitleStyle: {
+    fontWeight: Typography.weights.bold,
+    color: Colors.textPrimary, // Ensure text color is primary
+  },
+  headerTitleAlign: 'left',
+};
 
 export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   const learningList = useSelector(state => state.learningList.learningList || []);
@@ -129,7 +142,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
               position: 'absolute',
               top: -8,
               right: -12,
-              backgroundColor: Colors.error,
+              backgroundColor: Colors.secondary,
               borderRadius: 12,
               minWidth: 18,
               height: 18,
@@ -194,18 +207,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
 
 const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
   return (
-    <ProfileStack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: Colors.secondary,
-        },
-        headerTintColor: Colors.textPrimary,
-        headerTitleStyle: {
-          fontWeight: Typography.weights.bold,
-        },
-        headerTitleAlign: 'left',
-      }}
-    >
+    <ProfileStack.Navigator screenOptions={headerOptions}>
       {isLoggedIn ? (
         <>
           <ProfileStack.Screen 
@@ -237,6 +239,7 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('drugs');
   const [isLoggedIn, setIsLoggedInState] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkLoginStatus = async () => {
@@ -246,6 +249,8 @@ const MainApp = () => {
       } catch (error) {
         console.error('Error checking login status:', error);
         setIsLoggedInState(false);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -256,22 +261,15 @@ const MainApp = () => {
     setIsLoggedInState(status);
   };
 
+  if (loading) {
+    return <LoadingIndicator message="Loading..." />;
+  }
+
   const renderContent = () => {
     switch(activeTab) {
       case 'drugs':
         return (
-          <Stack.Navigator
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: Colors.secondary,
-              },
-              headerTintColor: Colors.textPrimary,
-              headerTitleStyle: {
-                fontWeight: Typography.weights.bold,
-              },
-              headerTitleAlign: 'left',
-            }}
-          >
+          <Stack.Navigator screenOptions={headerOptions}>
             <Stack.Screen 
               name="Categories" 
               component={CategoriesScreen} 
@@ -293,18 +291,7 @@ const MainApp = () => {
       case 'learning':
         if (isLoggedIn) {
           return (
-            <Stack.Navigator
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: Colors.secondary,
-                },
-                headerTintColor: Colors.textPrimary,
-                headerTitleStyle: {
-                  fontWeight: Typography.weights.bold,
-                },
-                headerTitleAlign: 'left',
-              }}
-            >
+            <Stack.Navigator screenOptions={headerOptions}>
               <Stack.Screen 
                 name="LearningList" 
                 component={LearningListScreen} 
@@ -326,18 +313,7 @@ const MainApp = () => {
       
       case 'community':
         return (
-          <Stack.Navigator
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: Colors.secondary,
-              },
-              headerTintColor: Colors.textPrimary,
-              headerTitleStyle: {
-                fontWeight: Typography.weights.bold,
-              },
-              headerTitleAlign: 'left',
-            }}
-          >
+          <Stack.Navigator screenOptions={headerOptions}>
             <Stack.Screen 
               name="Community" 
               component={() => <PlaceholderScreen title="Community" />} 
@@ -372,7 +348,6 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-
         await Promise.all([
           AuthService.isLoggedIn(),
           new Promise(resolve => setTimeout(resolve, 2000)),
@@ -387,7 +362,6 @@ export default function App() {
     prepare();
   }, []);
 
-  // Only hide the splash screen once the app is ready AND layout is complete
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
       try {
@@ -404,9 +378,9 @@ export default function App() {
 
   return (
     <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
+      <PersistGate loading={<LoadingIndicator />} persistor={persistor}>
         <SafeAreaProvider onLayout={onLayoutRootView}>
-          <StatusBar style="auto" />
+          <StatusBar style="dark" /> 
           <NavigationContainer>
             <MainApp />
           </NavigationContainer>

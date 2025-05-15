@@ -204,7 +204,7 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
                      >
                         <Text
                            style={{
-                              color: selectedSpeed === speed ? Colors.textPrimary : Colors.textPrimary,
+                              color: selectedSpeed === speed ? Colors.textLight : Colors.textSecondary,
                               fontWeight: selectedSpeed === speed ? Typography.weights.bold : Typography.weights.regular,
                               fontSize: Typography.sizes.small,
                            }}

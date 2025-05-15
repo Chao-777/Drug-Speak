@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FlatList, View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, RefreshControl, SafeAreaView, FlatList, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Spacing, Typography, Borders, Shadows } from '../constants/color';
+import { Colors, Spacing } from '../constants/color';
 import RecordService from '../api/recordService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DrugCard from '../components/DrugCard';
+import FinishedDrugCard from '../components/FinishedDrugCard';
+import {ExpandableSectionHeader} from '../components/SectionHeader';
+import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
+import StatsBar from '../components/StatsBar';
+import LoadingIndicator from '../components/LoadingIndicator';
 import { updateLearningStatus, removeFromLearningList } from '../store/learningListSlice';
 
 const LearningListScreen = ({ navigation }) => {
@@ -26,26 +32,22 @@ const LearningListScreen = ({ navigation }) => {
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
 
-   // Force sync stats with local counts
    useEffect(() => {
-      // This effect will run when currentLearning or finishedLearning change
       const syncStats = async () => {
          if (studyStats.currentLearning !== currentLearning.length || 
-             studyStats.finishedLearning !== finishedLearning.length) {
+            studyStats.finishedLearning !== finishedLearning.length) {
             
-            // Only update if user is logged in
             const userDataString = await AsyncStorage.getItem('userData');
             if (userDataString) {
                const newStats = {
                   currentLearning: currentLearning.length,
                   finishedLearning: finishedLearning.length,
-                  totalScore: studyStats.totalScore // Keep the existing score
+                  totalScore: studyStats.totalScore 
                };
                
                try {
                   await RecordService.upsertStudyRecord(newStats);
                   setStudyStats(newStats);
-                  console.log('Stats synced with local counts:', newStats);
                } catch (error) {
                   console.error('Error syncing stats with local counts:', error);
                }
@@ -74,7 +76,6 @@ const LearningListScreen = ({ navigation }) => {
          try {
             const studyRecord = await RecordService.getStudyRecordById(userData.id);
             
-            // If remote counts don't match local counts, prioritize local counts
             const remoteStats = {
                currentLearning: studyRecord.currentLearning || 0,
                finishedLearning: studyRecord.finishedLearning || 0,
@@ -82,20 +83,18 @@ const LearningListScreen = ({ navigation }) => {
             };
             
             if (remoteStats.currentLearning !== currentLearning.length || 
-                remoteStats.finishedLearning !== finishedLearning.length) {
+               remoteStats.finishedLearning !== finishedLearning.length) {
                
-               // Update backend with local counts
                const updatedStats = {
                   currentLearning: currentLearning.length,
                   finishedLearning: finishedLearning.length,
-                  totalScore: remoteStats.totalScore // Keep the score
+                  totalScore: remoteStats.totalScore 
                };
                
                await RecordService.upsertStudyRecord(updatedStats);
                setStudyStats(updatedStats);
                console.log('Remote stats updated with local counts:', updatedStats);
             } else {
-               // Remote stats match local counts, use them
                setStudyStats(remoteStats);
             }
          } catch (error) {
@@ -127,23 +126,18 @@ const LearningListScreen = ({ navigation }) => {
 
    const handleReviewDrug = async (drug) => {
       try {
-         // Move drug from Finished to Current Learning list
          dispatch(updateLearningStatus({ id: drug.id, status: 'current' }));
          
-         // Update stats
          const updatedStats = {
             currentLearning: studyStats.currentLearning + 1,
             finishedLearning: studyStats.finishedLearning - 1,
             totalScore: studyStats.totalScore
          };
          
-         // Update backend
          await RecordService.upsertStudyRecord(updatedStats);
          
-         // Update local state
          setStudyStats(updatedStats);
          
-         // Show confirmation
          Alert.alert(
             "Moved to Current Learning",
             `${drug.name} has been moved back to your Current Learning list.`,
@@ -161,7 +155,6 @@ const LearningListScreen = ({ navigation }) => {
 
    const handleRemoveDrug = async (drug) => {
       try {
-         // Ask for confirmation
          Alert.alert(
             "Remove Drug",
             `Are you sure you want to remove ${drug.name} from your ${drug.status === 'finished' ? 'Finished' : 'Learning'} list?`,
@@ -174,10 +167,8 @@ const LearningListScreen = ({ navigation }) => {
                   text: "Remove",
                   style: "destructive",
                   onPress: async () => {
-                     // Remove drug from learning list
                      dispatch(removeFromLearningList(drug.id));
                      
-                     // Update stats based on which list it was in
                      const updatedStats = {
                         currentLearning: drug.status === 'current' ? 
                            Math.max(0, studyStats.currentLearning - 1) : 
@@ -188,10 +179,8 @@ const LearningListScreen = ({ navigation }) => {
                         totalScore: studyStats.totalScore
                      };
                      
-                     // Update backend
                      await RecordService.upsertStudyRecord(updatedStats);
                      
-                     // Update local state
                      setStudyStats(updatedStats);
                   }
                }
@@ -222,333 +211,16 @@ const LearningListScreen = ({ navigation }) => {
       fetchStudyRecord();
    };
 
-   const renderCurrentDrugItem = ({ item }) => (
-      <TouchableOpacity 
-         style={{
-            backgroundColor: Colors.cardBackground,
-            padding: Spacing.lg,
-            marginVertical: Spacing.sm,
-            borderRadius: Borders.radius.medium,
-            ...Shadows.glassSmall
-         }}
-         onPress={() => navigation.navigate('LearningScreen', { drug: item })}
-         activeOpacity={0.7}
-      >
-         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  fontWeight: Typography.weights.medium,
-                  color: Colors.textPrimary
-               }}>
-                  {item.name}
-               </Text>
-               
-               {item.other_names && item.other_names.length > 0 && (
-                  <Text style={{
-                     fontSize: Typography.sizes.small,
-                     color: Colors.textSecondary,
-                     marginTop: Spacing.xs
-                  }}>
-                     {item.other_names.join(', ')}
-                  </Text>
-               )}
-            </View>
-            
-            <Text style={{
-               fontSize: Typography.sizes.small,
-               fontWeight: Typography.weights.bold,
-               color: Colors.primary,
-               marginLeft: Spacing.xs
-            }}>
-               {item.molecular_formula}
-            </Text>
-         </View>
-      </TouchableOpacity>
-   );
-
-   const renderFinishedDrugItem = ({ item }) => (
-      <View
-         style={{
-            backgroundColor: Colors.cardBackground,
-            padding: Spacing.lg,
-            marginVertical: Spacing.sm,
-            borderRadius: Borders.radius.medium,
-            ...Shadows.glassSmall
-         }}
-      >
-         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
-            <View style={{ flex: 1 }}>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  fontWeight: Typography.weights.medium,
-                  color: Colors.textPrimary
-               }}>
-                  {item.name}
-               </Text>
-               
-               {item.other_names && item.other_names.length > 0 && (
-                  <Text style={{
-                     fontSize: Typography.sizes.small,
-                     color: Colors.textSecondary,
-                     marginTop: Spacing.xs
-                  }}>
-                     {item.other_names.join(', ')}
-                  </Text>
-               )}
-            </View>
-            
-            <Text style={{
-               fontSize: Typography.sizes.small,
-               fontWeight: Typography.weights.bold,
-               color: Colors.primary,
-               marginLeft: Spacing.xs
-            }}>
-               {item.molecular_formula}
-            </Text>
-         </View>
-
-
-         <View style={{ 
-            flexDirection: 'row', 
-            justifyContent: 'space-between',
-            marginTop: Spacing.sm,
-            borderTopWidth: 1,
-            borderTopColor: Colors.border,
-            paddingTop: Spacing.sm
-         }}>
-            <TouchableOpacity
-               style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: Colors.primary,
-                  paddingVertical: Spacing.xs,
-                  paddingHorizontal: Spacing.sm,
-                  borderRadius: Borders.radius.small,
-               }}
-               onPress={() => handleReviewDrug(item)}
-            >
-               <Icon name="refresh" size={16} color="white" />
-               <Text style={{
-                  color: 'white',
-                  fontWeight: Typography.weights.medium,
-                  fontSize: Typography.sizes.small,
-                  marginLeft: Spacing.xs
-               }}>
-                  Review
-               </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-               style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: Colors.cardBackground,
-                  borderColor: Colors.error,
-                  borderWidth: 1,
-                  paddingVertical: Spacing.xs,
-                  paddingHorizontal: Spacing.sm,
-                  borderRadius: Borders.radius.small,
-               }}
-               onPress={() => handleRemoveDrug(item)}
-            >
-               <Icon name="delete-outline" size={16} color={Colors.error} />
-               <Text style={{
-                  color: Colors.error,
-                  fontWeight: Typography.weights.medium,
-                  fontSize: Typography.sizes.small,
-                  marginLeft: Spacing.xs
-               }}>
-                  Remove
-               </Text>
-            </TouchableOpacity>
-         </View>
-      </View>
-   );
-
-   const SectionHeader = ({ title, count, isExpanded, onToggle }) => (
-      <TouchableOpacity 
-         style={{
-         flexDirection: 'row',
-         justifyContent: 'space-between',
-         alignItems: 'center',
-         paddingVertical: Spacing.md,
-         paddingHorizontal: Spacing.lg,
-         marginTop: Spacing.md,
-         marginBottom: Spacing.xs,
-         borderBottomWidth: 1,
-         borderBottomColor: Colors.border,
-         }}
-         onPress={onToggle}
-      >
-         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-         <Text style={{
-            fontSize: Typography.sizes.subtitle,
-            fontWeight: Typography.weights.bold,
-            color: Colors.textPrimary
-         }}>
-            {title}
-         </Text>
-         
-         <Text style={{
-            fontSize: Typography.sizes.body,
-            color: Colors.primary,
-            fontWeight: Typography.weights.bold,
-            marginLeft: Spacing.sm
-         }}>
-            ({count})
-         </Text>
-         </View>
-         
-         <Icon 
-         name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-         size={24} 
-         color={Colors.textSecondary} 
-         />
-      </TouchableOpacity>
-   );
-
-   const EmptyState = () => (
-      <View style={{
-         flex: 1,
-         justifyContent: 'center',
-         alignItems: 'center',
-         padding: Spacing.xl,
-         paddingBottom: Spacing.xl + 80,
-      }}>
-         <Icon 
-         name="library-add" 
-         size={60} 
-         color={Colors.textLight} 
-         style={{ marginBottom: Spacing.lg }}
-         />
-         <Text style={{
-         fontSize: Typography.sizes.subtitle,
-         color: Colors.textSecondary,
-         textAlign: 'center',
-         }}>
-         Your learning list is empty. Add drugs to your list by pressing the "STUDY" button on drug details screens.
-         </Text>
-      </View>
-   );
-
-   const ErrorState = ({ message, onRetry }) => (
-      <View style={{
-         flex: 1,
-         justifyContent: 'center',
-         alignItems: 'center',
-         padding: Spacing.xl,
-      }}>
-         <Icon 
-            name="error-outline" 
-            size={60} 
-            color={Colors.error} 
-            style={{ marginBottom: Spacing.lg }}
-         />
-         <Text style={{
-            fontSize: Typography.sizes.subtitle,
-            color: Colors.textSecondary,
-            textAlign: 'center',
-            marginBottom: Spacing.lg,
-         }}>
-            {message || 'Something went wrong'}
-         </Text>
-         <TouchableOpacity
-            style={{
-               backgroundColor: Colors.primary,
-               paddingVertical: Spacing.sm,
-               paddingHorizontal: Spacing.lg,
-               borderRadius: Borders.radius.medium,
-            }}
-            onPress={onRetry}
-         >
-            <Text style={{ color: 'white', fontWeight: Typography.weights.bold }}>
-               Retry
-            </Text>
-         </TouchableOpacity>
-      </View>
-   );
-
-   const StatsBar = () => (
-      <View style={{
-         flexDirection: 'row',
-         justifyContent: 'space-around',
-         backgroundColor: Colors.cardBackground,
-         padding: Spacing.md,
-         marginBottom: Spacing.md,
-         borderBottomWidth: 1,
-         borderBottomColor: Colors.border,
-      }}>
-         <View style={{ alignItems: 'center' }}>
-            <Text style={{ 
-               fontSize: Typography.sizes.small, 
-               color: Colors.textSecondary 
-            }}>
-               Current
-            </Text>
-            <Text style={{ 
-               fontSize: Typography.sizes.title, 
-               fontWeight: Typography.weights.bold, 
-               color: Colors.textPrimary
-            }}>
-               {currentLearning.length}
-            </Text>
-         </View>
-         
-         <View style={{ alignItems: 'center' }}>
-            <Text style={{ 
-               fontSize: Typography.sizes.small, 
-               color: Colors.textSecondary 
-            }}>
-               Finished
-            </Text>
-            <Text style={{ 
-               fontSize: Typography.sizes.title, 
-               fontWeight: Typography.weights.bold, 
-               color: Colors.success 
-            }}>
-               {finishedLearning.length}
-            </Text>
-         </View>
-         
-         <View style={{ alignItems: 'center' }}>
-            <Text style={{ 
-               fontSize: Typography.sizes.small, 
-               color: Colors.textSecondary 
-            }}>
-               Score
-            </Text>
-            <Text style={{ 
-               fontSize: Typography.sizes.title, 
-               fontWeight: Typography.weights.bold, 
-               color: Colors.warning 
-            }}>
-               {studyStats.totalScore}
-            </Text>
-         </View>
-      </View>
-   );
+   const navigateToLearningScreen = (drug) => {
+      navigation.navigate('LearningScreen', { drug });
+   };
 
    if (loading && !refreshing) {
-      return (
-         <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={{ marginTop: Spacing.md, color: Colors.textSecondary }}>
-               Loading your study progress...
-            </Text>
-         </SafeAreaView>
-      );
+      return <LoadingIndicator message="Loading your study progress..." />;
    }
 
    if (error && !refreshing) {
-      return (
-         <SafeAreaView style={{ flex: 1 }}>
-            <ErrorState 
-               message={error} 
-               onRetry={fetchStudyRecord} 
-            />
-         </SafeAreaView>
-      );
+      return <ErrorState message={error} onRetry={fetchStudyRecord} />;
    }
 
    return (
@@ -557,15 +229,21 @@ const LearningListScreen = ({ navigation }) => {
          backgroundColor: Colors.background,
       }}>
          {learningList.length === 0 ? (
-            <EmptyState />
+            <EmptyState 
+               message="Your learning list is empty. Add drugs to your list by pressing the 'STUDY' button on drug details screens."
+            />
          ) : (
             <FlatList
                data={[]} 
                ListHeaderComponent={() => (
                   <View style={{ paddingBottom: 100 }}>
-                     <StatsBar />
+                     <StatsBar 
+                        currentCount={currentLearning.length}
+                        finishedCount={finishedLearning.length}
+                        totalScore={studyStats.totalScore}
+                     />
                      
-                     <SectionHeader 
+                     <ExpandableSectionHeader
                         title="Current Learning" 
                         count={currentLearning.length}
                         isExpanded={currentExpanded}
@@ -574,11 +252,14 @@ const LearningListScreen = ({ navigation }) => {
                      
                      {currentExpanded && currentLearning.map(item => (
                         <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                           {renderCurrentDrugItem({ item })}
+                           <DrugCard 
+                              drug={item} 
+                              onPress={() => navigateToLearningScreen(item)}
+                           />
                         </View>
                      ))}
                      
-                     <SectionHeader 
+                     <ExpandableSectionHeader
                         title="Finished" 
                         count={finishedLearning.length}
                         isExpanded={finishedExpanded}
@@ -587,7 +268,11 @@ const LearningListScreen = ({ navigation }) => {
                      
                      {finishedExpanded && finishedLearning.map(item => (
                         <View key={item.id} style={{ marginHorizontal: Spacing.md }}>
-                           {renderFinishedDrugItem({ item })}
+                           <FinishedDrugCard
+                              drug={item}
+                              onReview={handleReviewDrug}
+                              onRemove={handleRemoveDrug}
+                           />
                         </View>
                      ))}
                   </View>

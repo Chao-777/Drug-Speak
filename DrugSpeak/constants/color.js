@@ -1,22 +1,22 @@
 export const Colors = {
-   primary: '#FF7E33',
-   primaryDark: '#E05E00',
-   primaryLight: '#FFA366',
+   primary: '#317175',           
+   primaryDark: '#235254',       
+   primaryLight: '#4D8E91',      
    
-   secondary: 'rgba(255, 255, 255, 0.85)', 
-   secondaryDark: 'rgba(230, 230, 230, 0.85)',
-   secondaryLight: 'rgba(255, 255, 255, 0.95)',
+   secondary: '#E05D3D',        
+   secondaryDark: '#B84A2E',    
+   secondaryLight: '#F08271',       
+
+   textPrimary: '#333333',       
+   textSecondary: '#666666',     
+   textLight: '#ffffff',         
    
-   textPrimary: '#333333',
-   textSecondary: '#666666',
-   textLight: '#999999',
+   success: '#4CAF50',           
+   warning: '#FF9800',           
+   error: '#F44336',             
+   info: '#2196F3',              
    
-   success: '#4CAF50',
-   warning: '#FF9800', 
-   error: '#F44336',
-   info: '#2196F3',
-   
-   background: '#F9F9F9',
+   background: '#F9F9F9',        
    cardBackground: 'rgba(255, 255, 255, 0.75)', 
    
    male: {
@@ -30,7 +30,6 @@ export const Colors = {
    
    border: 'rgba(221, 221, 221, 0.5)',
    
-   
    glass: {
       background: 'rgba(255, 255, 255, 0.6)',
       border: 'rgba(255, 255, 255, 0.2)',
@@ -38,40 +37,6 @@ export const Colors = {
    }
 };
 
-export const Spacing = {
-   xs: 5,
-   sm: 10,
-   md: 15,
-   lg: 20,
-   xl: 30,
-   xxl: 40,
-};
-
-export const Typography = {
-   fontFamily: {
-      inter: 'Inter',
-      interLight: 'Inter-Light',
-      interRegular: 'Inter-Regular',
-      interMedium: 'Inter-Medium',
-      interSemiBold: 'Inter-SemiBold',
-      interBold: 'Inter-Bold',
-   },
-   sizes: {
-      small: 12,
-      body: 16,
-      subtitle: 18,
-      title: 20,
-      heading: 24,
-      large: 30,
-   },
-   weights: {
-      light: '300',
-      regular: 'normal',
-      medium: '500',
-      semiBold: '600',
-      bold: 'bold',
-   },
-};
 
 export const Shadows = {
    glassSmall: {
@@ -82,16 +47,16 @@ export const Shadows = {
       elevation: 3,
    },
    glassMedium: {
-      shadowColor: '#FF7E33',
+      shadowColor: '#317175',    
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
+      shadowOpacity: 0.5,       
       shadowRadius: 12,
       elevation: 5,
    },
    glassLarge: {
-      shadowColor: '#FF7E33',
+      shadowColor: '#317175',    
       shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 1,
+      shadowOpacity: 0.5,       
       shadowRadius: 16,
       elevation: 8,
    },
@@ -119,6 +84,33 @@ export const Shadows = {
    },
 };
 
+export const Spacing = {
+   xs: 5,
+   sm: 10,
+   md: 15,
+   lg: 20,
+   xl: 30,
+   xxl: 40,
+};
+
+export const Typography = {
+   sizes: {
+      small: 12,
+      body: 16,
+      subtitle: 18,
+      title: 20,
+      heading: 24,
+      large: 30,
+   },
+   weights: {
+      light: '300',
+      regular: 'normal',
+      medium: '500',
+      semiBold: '600',
+      bold: 'bold',
+   },
+};
+
 export const Borders = {
    radius: {
       small: 3,
@@ -132,7 +124,6 @@ export const Borders = {
       thick: 2,
    },
 };
-
 
 export const theme = {
    colors: Colors,

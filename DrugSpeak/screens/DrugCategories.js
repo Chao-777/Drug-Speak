@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, SafeAreaView } from 'react-native';
+import { SafeAreaView } from 'react-native';
 import { getCategories } from '../data/drugs';
 import CategoryCard from '../components/CategoryCard';
 import Header from '../components/Header';
-import { Colors, Spacing } from '../constants/color';
+import ReusableFlatList from '../components/ReusableFlatlist';
+import { Colors } from '../constants/color';
 
 const CategoriesScreen = ({ navigation }) => {
    const [categories, setCategories] = useState([]);
@@ -33,19 +34,10 @@ const CategoriesScreen = ({ navigation }) => {
          }}
       >
          <Header title="Categories" />
-         <FlatList
-         style={{
-            flex: 1,
-            height: '100%',
-         }}
-         data={categories}
-         renderItem={renderCategoryItem}
-         keyExtractor={(item) => item.id}
-         contentContainerStyle={{
-            padding: Spacing.md,
-            paddingBottom: Spacing.xxl,
-         }}
-         showsVerticalScrollIndicator={true}
+         <ReusableFlatList
+            data={categories}
+            renderItem={renderCategoryItem}
+            keyExtractor={(item) => item.id}
          />
       </SafeAreaView>
    );

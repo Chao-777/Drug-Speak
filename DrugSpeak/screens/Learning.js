@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, SafeAreaView, View, Text, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { Audio } from 'expo-av';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Spacing, Typography, Borders } from '../constants/color';
-import PronunciationCard from '../components/PronunciationCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { removeFromLearningList, updateLearningStatus } from '../store/learningListSlice';
 import { drugCategory } from '../data/resource';
 import RecordService from '../api/recordService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, Typography, Spacing } from '../constants/color';
+import PronunciationCard from '../components/PronunciationCard';
+import DrugHeader from '../components/DrugHeader';
+import ContentSection from '../components/ContentSection';
+import LabeledText from '../components/LabeledText';
+import {SectionHeader} from '../components/SectionHeader';
+import {RecordButton} from '../components/Button';
+import RecordingItem from '../components/RecordingItem';
+import BottomActionBar from '../components/BottomActionBar';
+import AudioRecorderManager from '../services/AudioRecorderManager';
 
 const LearningScreen = ({ route, navigation }) => {
    const { drug } = route.params;
@@ -22,9 +28,7 @@ const LearningScreen = ({ route, navigation }) => {
       totalScore: 0
    });
    const [userData, setUserData] = useState(null);
-   
-   // Recording state
-   const [recording, setRecording] = useState();
+      const [recording, setRecording] = useState();
    const [isRecording, setIsRecording] = useState(false);
    const [recordings, setRecordings] = useState([]);
    const [sound, setSound] = useState(null);
@@ -33,11 +37,9 @@ const LearningScreen = ({ route, navigation }) => {
    const currentLearning = learningList.filter(item => item.status === 'current');
    const finishedLearning = learningList.filter(item => item.status === 'finished');
 
-   // Key for storing recordings in AsyncStorage
    const RECORDINGS_STORAGE_KEY = `recordings_${drug.id}`;
 
    useEffect(() => {
-      // Load user data and statistics
       const loadData = async () => {
          try {
             const userDataString = await AsyncStorage.getItem('userData');
@@ -81,49 +83,32 @@ const LearningScreen = ({ route, navigation }) => {
       
       loadData();
       
-      // Load saved recordings for this drug
       loadRecordings();
       
-      // Set up audio recording permissions
       setupAudioRecording();
       
-      // Clean up when component unmounts
       return () => {
          if (recording) {
             recording.stopAndUnloadAsync();
          }
-         if (sound) {
-            sound.unloadAsync();
-         }
+         
+         stopAnyPlayback();
       };
    }, []);
 
    const setupAudioRecording = async () => {
       try {
-         // Request permissions
-         await Audio.requestPermissionsAsync();
-         await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-         });
+         await AudioRecorderManager.requestPermissions();
       } catch (err) {
          console.error('Failed to get recording permissions', err);
+         Alert.alert('Permission Error', 'Cannot access microphone. Please check app permissions.');
       }
    };
 
    const loadRecordings = async () => {
       try {
-         console.log(`Loading recordings for drug ${drug.id}`);
-         const savedRecordings = await AsyncStorage.getItem(RECORDINGS_STORAGE_KEY);
-         
-         if (savedRecordings) {
-            console.log('Found saved recordings:', savedRecordings);
-            const parsedRecordings = JSON.parse(savedRecordings);
-            setRecordings(parsedRecordings);
-         } else {
-            console.log('No saved recordings found');
-            setRecordings([]);
-         }
+         const savedRecordings = await AudioRecorderManager.loadStoredRecordings(RECORDINGS_STORAGE_KEY);
+         setRecordings(savedRecordings);
       } catch (error) {
          console.error('Error loading recordings:', error);
          Alert.alert('Error', 'Failed to load your recordings');
@@ -132,10 +117,7 @@ const LearningScreen = ({ route, navigation }) => {
    
    const saveRecordings = async (updatedRecordings) => {
       try {
-         console.log(`Saving ${updatedRecordings.length} recordings for drug ${drug.id}`);
-         const jsonValue = JSON.stringify(updatedRecordings);
-         await AsyncStorage.setItem(RECORDINGS_STORAGE_KEY, jsonValue);
-         console.log('Recordings saved successfully');
+         await AudioRecorderManager.saveRecordings(RECORDINGS_STORAGE_KEY, updatedRecordings);
       } catch (error) {
          console.error('Error saving recordings:', error);
          Alert.alert('Error', 'Failed to save your recording');
@@ -144,18 +126,12 @@ const LearningScreen = ({ route, navigation }) => {
 
    const startRecording = async () => {
       try {
-         // Ensure permissions and setup
          await setupAudioRecording();
-
-         console.log('Starting recording...');
-         // Create new recording instance
-         const { recording: newRecording } = await Audio.Recording.createAsync(
-            Audio.RecordingOptionsPresets.HIGH_QUALITY
-         );
+         await stopAnyPlayback();
          
+         const newRecording = await AudioRecorderManager.startNewRecording();
          setRecording(newRecording);
          setIsRecording(true);
-         console.log('Recording started');
       } catch (err) {
          console.error('Failed to start recording', err);
          Alert.alert('Error', 'Failed to start recording');
@@ -165,79 +141,62 @@ const LearningScreen = ({ route, navigation }) => {
    const stopRecording = async () => {
       try {
          if (!recording) {
-            console.log('No recording to stop');
             return;
          }
          
-         console.log('Stopping recording...');
-         // Stop recording
-         await recording.stopAndUnloadAsync();
+         const uri = await AudioRecorderManager.stopRecording(recording);
          
-         // Get recording URI
-         const uri = recording.getURI();
-         console.log('Recording saved at:', uri);
-         
-         // Create a new recording entry
          const newRecording = {
             id: Date.now().toString(),
             uri,
-            timestamp: new Date().toISOString(), // Store as ISO string for consistent serialization
-            evaluation: 'good', // Default evaluation
+            timestamp: new Date().toISOString(),
+            evaluation: 'good', 
          };
          
-         // Add to recordings list
          const updatedRecordings = [...recordings, newRecording];
          setRecordings(updatedRecordings);
          
-         // Save to storage
          await saveRecordings(updatedRecordings);
          
-         // Reset recording
          setRecording(undefined);
          setIsRecording(false);
-         console.log('Recording stopped and saved');
       } catch (err) {
          console.error('Failed to stop recording', err);
          Alert.alert('Error', 'Failed to save recording');
       }
    };
 
+   const stopAnyPlayback = async () => {
+      if (sound) {
+         try {
+            await AudioRecorderManager.stopSound(sound);
+            setSound(null);
+            setPlayingRecordingId(null);
+         } catch (error) {
+            console.error('Error stopping playback:', error);
+         }
+      }
+   };
+
    const playRecording = async (recordingId) => {
       try {
-         // If already playing this recording, stop it
          if (playingRecordingId === recordingId) {
-            if (sound) {
-               await sound.stopAsync();
-               setPlayingRecordingId(null);
-            }
+            await stopAnyPlayback();
             return;
          }
          
-         // Stop any current playback
-         if (sound) {
-            await sound.stopAsync();
-            await sound.unloadAsync();
-            setSound(null);
-         }
+         await stopAnyPlayback();
          
-         // Find the recording
          const recordingToPlay = recordings.find(rec => rec.id === recordingId);
          if (!recordingToPlay) {
             console.error('Recording not found:', recordingId);
             return;
          }
          
-         console.log('Playing recording:', recordingToPlay.uri);
-         // Load and play the sound
-         const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: recordingToPlay.uri },
-            { shouldPlay: true }
-         );
+         const newSound = await AudioRecorderManager.playSound(recordingToPlay.uri);
          
-         // Set up completion callback
          newSound.setOnPlaybackStatusUpdate(status => {
             if (status.didJustFinish) {
-               console.log('Playback finished');
                setPlayingRecordingId(null);
             }
          });
@@ -252,7 +211,6 @@ const LearningScreen = ({ route, navigation }) => {
    };
 
    const deleteRecording = (recordingId) => {
-      // Confirm deletion
       Alert.alert(
          "Delete Recording",
          "Are you sure you want to delete this recording?",
@@ -266,22 +224,14 @@ const LearningScreen = ({ route, navigation }) => {
                style: "destructive",
                onPress: async () => {
                   try {
-                     // If this recording is currently playing, stop it
-                     if (playingRecordingId === recordingId && sound) {
-                        await sound.stopAsync();
-                        await sound.unloadAsync();
-                        setSound(null);
-                        setPlayingRecordingId(null);
+                     if (playingRecordingId === recordingId) {
+                        await stopAnyPlayback();
                      }
                      
-                     console.log('Deleting recording:', recordingId);
-                     // Filter out the deleted recording
                      const updatedRecordings = recordings.filter(rec => rec.id !== recordingId);
                      setRecordings(updatedRecordings);
                      
-                     // Save to storage
                      await saveRecordings(updatedRecordings);
-                     console.log('Recording deleted and storage updated');
                   } catch (error) {
                      console.error('Error deleting recording:', error);
                      Alert.alert('Error', 'Failed to delete recording');
@@ -293,7 +243,6 @@ const LearningScreen = ({ route, navigation }) => {
    };
 
    const formatTimestamp = (timestamp) => {
-      // If timestamp is an ISO string, parse it to a Date object
       const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
       
       return date.toLocaleString('en-US', {
@@ -407,125 +356,19 @@ const LearningScreen = ({ route, navigation }) => {
       setOpenDropdownId(prev => prev === id ? null : id);
    };
 
-   const RecordingItem = ({ recording }) => (
-      <View style={{
-         flexDirection: 'row',
-         alignItems: 'center',
-         backgroundColor: Colors.cardBackground,
-         borderRadius: Borders.radius.medium,
-         padding: Spacing.md,
-         marginBottom: Spacing.sm,
-         borderWidth: 1,
-         borderColor: Colors.border,
-      }}>
-         {/* Play button */}
-         <TouchableOpacity
-            style={{
-               padding: Spacing.sm,
-               borderRadius: 20,
-               backgroundColor: playingRecordingId === recording.id ? Colors.error : Colors.primary,
-               marginRight: Spacing.md,
-            }}
-            onPress={() => playRecording(recording.id)}
-         >
-            <Icon
-               name={playingRecordingId === recording.id ? "stop" : "play-arrow"}
-               size={24}
-               color="white"
-            />
-         </TouchableOpacity>
-         
-         {/* Timestamp */}
-         <View style={{ flex: 1 }}>
-            <Text style={{
-               fontSize: Typography.sizes.small,
-               color: Colors.textSecondary,
-               marginBottom: 2,
-            }}>
-               {formatTimestamp(recording.timestamp)}
-            </Text>
-            
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  fontWeight: Typography.weights.medium,
-                  color: Colors.textPrimary,
-               }}>
-                  My Recording
-               </Text>
-            </View>
-         </View>
-         
-         {/* Delete button */}
-         <TouchableOpacity
-            style={{
-               padding: Spacing.sm,
-               borderRadius: 20,
-            }}
-            onPress={() => deleteRecording(recording.id)}
-         >
-            <Icon
-               name="delete"
-               size={24}
-               color={Colors.error}
-            />
-         </TouchableOpacity>
-      </View>
-   );
-
    return (
-      <SafeAreaView style={{
-         flex: 1,
-         backgroundColor: Colors.background,
-      }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
          <ScrollView>
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               alignItems: 'center',
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border,
-            }}>
-               <Text style={{
-                  fontSize: Typography.sizes.heading,
-                  fontWeight: Typography.weights.bold,
-                  color: Colors.textPrimary,
-                  textAlign: 'center',
-               }}>
-                  {drug.name}
-               </Text>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  color: Colors.textSecondary,
-                  marginTop: Spacing.xs,
-               }}>
-                  {drug.molecular_formula}
-               </Text>
-            </View>
-
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border,
-            }}>
-               <Text style={{
-                  fontSize: Typography.sizes.body,
-                  color: Colors.textPrimary,
-               }}>
-                  <Text style={{ fontWeight: Typography.weights.bold }}>
-                  Categories: 
-                  </Text>
-                  {' '}{getCategoryNames(drug.categories)}
-               </Text>
-            </View>
-
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               borderBottomWidth: Borders.width.thin,
-               borderBottomColor: Colors.border,
-            }}>
+            <DrugHeader name={drug.name} formula={drug.molecular_formula} />
+            
+            <ContentSection>
+               <LabeledText 
+                  label="Categories" 
+                  value={getCategoryNames(drug.categories)} 
+               />
+            </ContentSection>
+            
+            <ContentSection>
                <Text style={{
                   fontSize: Typography.sizes.body,
                   color: Colors.textPrimary,
@@ -533,143 +376,57 @@ const LearningScreen = ({ route, navigation }) => {
                }}>
                   {drug.desc}
                </Text>
-            </View>
-
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-            }}>
-               <Text style={{
-                  fontSize: Typography.sizes.subtitle,
-                  fontWeight: Typography.weights.bold,
-                  color: Colors.textPrimary,
-                  marginBottom: Spacing.sm,
-               }}>
-                  Pronunciation
-               </Text>
-               {drug.sounds && drug.sounds.map((sound, index) => (
+            </ContentSection>
+            
+            <ContentSection noBorder>
+               <SectionHeader title="Pronunciation" />
+               
+               {drug.sounds && drug.sounds.map((sound) => (
                   <PronunciationCard 
-                  key={`${drug.id}_${sound.gender}`}
-                  id={`${drug.id}_${sound.gender}`}
-                  drugName={drug.name} 
-                  gender={sound.gender}
-                  audioFile={sound.file}
-                  isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
-                  onToggleDropdown={handleToggleDropdown}
+                     key={`${drug.id}_${sound.gender}`}
+                     id={`${drug.id}_${sound.gender}`}
+                     drugName={drug.name} 
+                     gender={sound.gender}
+                     audioFile={sound.file}
+                     isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
+                     onToggleDropdown={handleToggleDropdown}
                   />
                ))}
-            </View>
-
-            <View style={{
-               padding: Spacing.lg,
-               backgroundColor: Colors.cardBackground,
-               marginTop: Spacing.md,
-               borderTopWidth: Borders.width.thin,
-               borderTopColor: Colors.border,
-            }}>
-               <Text style={{
-                  fontSize: Typography.sizes.subtitle,
-                  fontWeight: Typography.weights.bold,
-                  color: Colors.textPrimary,
-                  marginBottom: Spacing.md,
-               }}>
-                  Practice Pronunciation
-               </Text>
+            </ContentSection>
+            
+            <ContentSection style={{ marginTop: Spacing.md }}>
+               <SectionHeader title="Practice Pronunciation" />
                
-               <TouchableOpacity 
-                  style={{
-                     width: 120,
-                     height: 120,
-                     borderRadius: 60,
-                     backgroundColor: isRecording ? Colors.error : '#000080', 
-                     justifyContent: 'center',
-                     alignItems: 'center',
-                     alignSelf: 'center',
-                     marginBottom: Spacing.md,
-                  }}
-                  onPressIn={startRecording}
-                  onPressOut={stopRecording}
-               >
-                  <Text style={{
-                     color: 'white',
-                     fontWeight: Typography.weights.bold,
-                     fontSize: Typography.sizes.body,
-                     textAlign: 'center',
-                  }}>
-                     {isRecording ? 'Recording...' : 'Hold to Record'}
-                  </Text>
-               </TouchableOpacity>
-
-               {/* Recordings List */}
+               <RecordButton 
+                  isRecording={isRecording} 
+                  onPressIn={startRecording} 
+                  onPressOut={stopRecording} 
+               />
+               
                {recordings.length > 0 && (
                   <View style={{ marginTop: Spacing.md }}>
-                     <Text style={{
-                        fontSize: Typography.sizes.subtitle,
-                        fontWeight: Typography.weights.bold,
-                        color: Colors.textPrimary,
-                        marginBottom: Spacing.sm,
-                     }}>
-                        My Recordings ({recordings.length})
-                     </Text>
+                     <SectionHeader title={`My Recordings (${recordings.length})`} />
                      
                      {recordings.map(recording => (
-                        <RecordingItem key={recording.id} recording={recording} />
+                        <RecordingItem 
+                           key={recording.id} 
+                           recording={recording}
+                           playingRecordingId={playingRecordingId}
+                           onPlayPress={playRecording}
+                           onDeletePress={deleteRecording}
+                           formatTimestamp={formatTimestamp}
+                        />
                      ))}
                   </View>
                )}
-            </View>
+            </ContentSection>
          </ScrollView>
          
-         <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            borderTopWidth: 1,
-            borderTopColor: Colors.border,
-            paddingVertical: Spacing.sm,
-            paddingHorizontal: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-         }}>
-            <TouchableOpacity
-               style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-               }}
-               onPress={handleRemove}
-               disabled={isLoading}
-            >
-               <Icon name="delete-outline" size={24} color={isLoading ? Colors.textLight : Colors.error} />
-               <Text style={{
-                  marginLeft: Spacing.xs,
-                  color: isLoading ? Colors.textLight : Colors.error,
-                  fontSize: Typography.sizes.body,
-               }}>
-                  Remove
-               </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-               style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: isLoading ? Colors.textLight : Colors.primary,
-                  paddingVertical: Spacing.sm,
-                  paddingHorizontal: Spacing.md,
-                  borderRadius: Borders.radius.medium,
-               }}
-               onPress={handleFinish}
-               disabled={isLoading}
-            >
-               <Icon name="check" size={20} color="white" />
-               <Text style={{
-                  marginLeft: Spacing.xs,
-                  color: 'white',
-                  fontWeight: Typography.weights.bold,
-                  fontSize: Typography.sizes.body,
-               }}>
-                  {isLoading ? "Updating..." : "Finish"}
-               </Text>
-            </TouchableOpacity>
-         </View>
+         <BottomActionBar 
+            onRemove={handleRemove}
+            onFinish={handleFinish}
+            isLoading={isLoading}
+         />
       </SafeAreaView>
    );
 };
