@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text, Animated, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, TouchableOpacity, Text, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider } from 'react-redux';
@@ -20,61 +20,10 @@ import SignInScreen from './screens/SignIn';
 import UserProfileScreen from './screens/UserProfile';
 import AuthService from './api/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 
-
-const SplashScreen = () => {
-  const fadeAnim = new Animated.Value(1);
-  
-  useEffect(() => {
-    const fadeTimer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 1000,
-        useNativeDriver: true,
-      }).start();
-    }, 2500);
-    
-    return () => clearTimeout(fadeTimer);
-  }, []);
-  
-  return (
-    <Animated.View 
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        opacity: fadeAnim,
-      }}
-    >
-      <View style={{
-        backgroundColor: Colors.primary, 
-        borderRadius: 60,
-        width: 120,
-        height: 120,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 24,
-      }}>
-        <Text style={{
-          color: 'white',
-          fontSize: 60,
-          fontWeight: 'bold',
-        }}>DS</Text>
-      </View>
-      <Text style={{
-        fontSize: 40,
-        fontWeight: 'bold',
-        color: Colors.primary, 
-        marginBottom: 12,
-      }}>Drug Speak</Text>
-      <Text style={{
-        fontSize: 18,
-        color: Colors.textPrimary, 
-      }}>Your Medication Information Pal</Text>
-    </Animated.View>
-  );
-};
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 const PlaceholderScreen = ({ title }) => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
@@ -418,28 +367,49 @@ const MainApp = () => {
 };
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  
+  const [appIsReady, setAppIsReady] = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 4000);
-    
-    return () => clearTimeout(timer);
+    async function prepare() {
+      try {
+
+        await Promise.all([
+          AuthService.isLoggedIn(),
+          new Promise(resolve => setTimeout(resolve, 2000)),
+        ]);
+      } catch (e) {
+        console.warn('Error during app initialization:', e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
   }, []);
+
+  // Only hide the splash screen once the app is ready AND layout is complete
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn('Error hiding splash screen:', e);
+      }
+    }
+  }, [appIsReady]);
+
+  if (!appIsReady) {
+    return null;
+  }
 
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <SafeAreaProvider>
+        <SafeAreaProvider onLayout={onLayoutRootView}>
           <StatusBar style="auto" />
-          {isLoading ? (
-            <SplashScreen />
-          ) : (
-            <NavigationContainer>
-              <MainApp />
-            </NavigationContainer>
-          )}
+          <NavigationContainer>
+            <MainApp />
+          </NavigationContainer>
         </SafeAreaProvider>
       </PersistGate>
     </Provider>

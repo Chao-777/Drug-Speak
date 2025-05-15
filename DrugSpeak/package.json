@@ -24,7 +24,8 @@
     "react-native-screens": "~4.4.0",
     "react-redux": "^9.2.0",
     "redux-persist": "^6.0.0",
-    "styled-components": "^5.3.10"
+    "styled-components": "^5.3.10",
+    "expo-splash-screen": "~0.29.24"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
