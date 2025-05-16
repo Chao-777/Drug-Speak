@@ -1,75 +1,104 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Spacing, Typography, Borders } from '../constants/color';
 
 const RecordingItem = ({ 
-   recording, 
-   playingRecordingId, 
-   onPlayPress, 
-   onDeletePress,
-   formatTimestamp 
+  recording, 
+  playingRecordingId, 
+  onPlayPress, 
+  onDeletePress,
+  onEvaluatePress,
+  formatTimestamp,
+  isEvaluating
 }) => (
-   <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: Colors.cardBackground,
-      borderRadius: Borders.radius.medium,
-      padding: Spacing.md,
-      marginBottom: Spacing.sm,
-      borderWidth: 1,
-      borderColor: Colors.border,
-   }}>
+  <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.playButton}
+      onPress={() => onPlayPress(recording.id)}
+      disabled={isEvaluating}
+    >
+      <Icon
+        name={playingRecordingId === recording.id ? "stop" : "play-arrow"}
+        size={24}
+        color="white"
+      />
+    </TouchableOpacity>
+    
+    <View style={styles.infoContainer}>
+      <Text style={styles.timestamp}>
+        {formatTimestamp(recording.timestamp)}
+        {recording.score !== undefined && (
+          <Text style={styles.score}> ({recording.score})</Text>
+        )}
+      </Text>
+    </View>
+    
+    <View style={styles.actionsContainer}>
       <TouchableOpacity
-         style={{
-         padding: Spacing.sm,
-         borderRadius: 20,
-         backgroundColor: playingRecordingId === recording.id ? Colors.error : Colors.primary,
-         marginRight: Spacing.md,
-         }}
-         onPress={() => onPlayPress(recording.id)}
+        style={styles.actionButton}
+        onPress={() => onDeletePress(recording.id)}
+        disabled={isEvaluating}
       >
-         <Icon
-         name={playingRecordingId === recording.id ? "stop" : "play-arrow"}
-         size={24}
-         color="white"
-         />
+        <Icon name="delete" size={22} color={Colors.error} />
       </TouchableOpacity>
       
-      <View style={{ flex: 1 }}>
-         <Text style={{
-         fontSize: Typography.sizes.small,
-         color: Colors.textSecondary,
-         marginBottom: 2,
-         }}>
-         {formatTimestamp(recording.timestamp)}
-         </Text>
-         
-         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-         <Text style={{
-            fontSize: Typography.sizes.body,
-            fontWeight: Typography.weights.medium,
-            color: Colors.textPrimary,
-         }}>
-            My Recording
-         </Text>
-         </View>
-      </View>
-      
       <TouchableOpacity
-         style={{
-         padding: Spacing.sm,
-         borderRadius: 20,
-         }}
-         onPress={() => onDeletePress(recording.id)}
+        style={styles.actionButton}
+        onPress={() => onEvaluatePress(recording.id)}
+        disabled={isEvaluating}
       >
-         <Icon
-         name="delete"
-         size={24}
-         color={Colors.error}
-         />
+        {isEvaluating ? (
+          <ActivityIndicator size="small" color={Colors.secondary} />
+        ) : (
+          <Icon name="equalizer" size={22} color={Colors.secondary} />
+        )}
       </TouchableOpacity>
-   </View>
+    </View>
+  </View>
 );
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.cardBackground,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  timestamp: {
+    fontSize: Typography.sizes.body,
+    color: Colors.textPrimary,
+  },
+  score: {
+    fontWeight: Typography.weights.bold,
+    color: Colors.secondary,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: Spacing.xs,
+  },
+});
 
 export default RecordingItem;

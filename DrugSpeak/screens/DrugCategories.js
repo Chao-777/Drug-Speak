@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native';
 import { getCategories } from '../data/drugs';
 import CategoryCard from '../components/CategoryCard';
 import Header from '../components/Header';
-import ReusableFlatList from '../components/ReusableFlatlist';
+import ReusableFlatList from '../components/ReusableFlatList';
 import { Colors } from '../constants/color';
 
 const CategoriesScreen = ({ navigation }) => {

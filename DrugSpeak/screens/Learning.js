@@ -15,6 +15,9 @@ import {RecordButton} from '../components/Button';
 import RecordingItem from '../components/RecordingItem';
 import BottomActionBar from '../components/BottomActionBar';
 import AudioRecorderManager from '../services/AudioRecorderManager';
+import AudioComparisonService from '../services/AudioComparisonService';
+import { updateDrugScore } from '../store/learningListSlice';
+
 
 const LearningScreen = ({ route, navigation }) => {
    const { drug } = route.params;
@@ -38,6 +41,80 @@ const LearningScreen = ({ route, navigation }) => {
    const finishedLearning = learningList.filter(item => item.status === 'finished');
 
    const RECORDINGS_STORAGE_KEY = `recordings_${drug.id}`;
+
+   const [evaluatingRecordingId, setEvaluatingRecordingId] = useState(null);
+   const [isUpdatingStats, setIsUpdatingStats] = useState(false);
+   const [drugScore, setDrugScore] = useState(0);
+
+   
+    // Modify the evaluateRecording function to properly handle score updates
+   const evaluateRecording = async (recordingId) => {
+      try {
+      setEvaluatingRecordingId(recordingId);
+      
+      const recordingToEvaluate = recordings.find(rec => rec.id === recordingId);
+      if (!recordingToEvaluate) {
+         throw new Error('Recording not found');
+      }
+      
+      // Get reference audio to compare with
+      const instructorAudio = drug.sounds && drug.sounds.length > 0 
+         ? drug.sounds[0].file 
+         : null;
+         
+      if (!instructorAudio) {
+         throw new Error('No reference audio available for comparison');
+      }
+      
+      // Stop any currently playing audio
+      await stopAnyPlayback();
+      
+      // Compare the audio files and get a score
+      const score = await AudioComparisonService.compareAudio(
+         recordingToEvaluate.uri,
+         instructorAudio
+      );
+      
+      // Update the recording with the new score
+      const updatedRecordings = recordings.map(rec => 
+         rec.id === recordingId 
+            ? { ...rec, score } 
+            : rec
+      );
+      
+      setRecordings(updatedRecordings);
+      
+      // Get previous highest score for this drug
+      const previousHighestScore = drugScore || 0;
+      
+      // If this new score is higher than the previous highest
+      if (score > previousHighestScore) {
+         // Update local drug score
+         setDrugScore(score);
+         
+         // Update in Redux store
+         dispatch(updateDrugScore({
+            id: drug.id,
+            score: score
+         }));
+      }
+      
+      // Save the updated recordings
+      await saveRecordings(updatedRecordings);
+      
+      // Alert the user of their score
+      Alert.alert(
+         "Evaluation Complete",
+         `Your pronunciation score: ${score}${score > previousHighestScore ? "\n\nThis is a new high score!" : ""}`
+      );
+      
+      } catch (error) {
+      console.error('Error evaluating recording:', error);
+      Alert.alert('Error', error.message || 'Failed to evaluate recording');
+      } finally {
+      setEvaluatingRecordingId(null);
+      }
+   };
 
    useEffect(() => {
       const loadData = async () => {
@@ -80,6 +157,11 @@ const LearningScreen = ({ route, navigation }) => {
             console.error('Error loading data:', error);
          }
       };
+
+      const drugInList = learningList.find(item => item.id === drug.id);
+      if (drugInList && drugInList.score) {
+         setDrugScore(drugInList.score);
+      }
       
       loadData();
       
@@ -287,30 +369,33 @@ const LearningScreen = ({ route, navigation }) => {
          
          const newStats = {
             currentLearning: updatedCurrentLearning,
-            finishedLearning: updatedFinishedLearning,
-            totalScore: studyStats.totalScore + 10 
+            finishedLearning: updatedFinishedLearning
          };
          
          await RecordService.upsertStudyRecord(newStats);
          
-         setStudyStats(newStats);
+         setStudyStats({
+            ...studyStats,
+            currentLearning: newStats.currentLearning,
+            finishedLearning: newStats.finishedLearning
+         });
          
          Alert.alert(
             "Success",
             `${drug.name} marked as finished!`,
             [{ text: "OK", onPress: () => navigation.goBack() }]
          );
-      } catch (error) {
+         } catch (error) {
          console.error('Error updating study record:', error);
          Alert.alert(
             "Error",
             error.message || "Failed to update study record",
             [{ text: "OK" }]
          );
-      } finally {
+         } finally {
          setIsLoading(false);
-      }
-   };
+         }
+      };
 
    const handleRemove = async () => {
       try {
@@ -359,7 +444,12 @@ const LearningScreen = ({ route, navigation }) => {
    return (
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
          <ScrollView>
-            <DrugHeader name={drug.name} formula={drug.molecular_formula} />
+         <DrugHeader 
+            name={drug.name} 
+            formula={drug.molecular_formula}
+            isInLearningList={true}
+            score={drugScore} 
+            />
             
             <ContentSection>
                <LabeledText 
@@ -408,14 +498,16 @@ const LearningScreen = ({ route, navigation }) => {
                      <SectionHeader title={`My Recordings (${recordings.length})`} />
                      
                      {recordings.map(recording => (
-                        <RecordingItem 
-                           key={recording.id} 
-                           recording={recording}
-                           playingRecordingId={playingRecordingId}
-                           onPlayPress={playRecording}
-                           onDeletePress={deleteRecording}
-                           formatTimestamp={formatTimestamp}
-                        />
+                     <RecordingItem 
+                        key={recording.id} 
+                        recording={recording}
+                        playingRecordingId={playingRecordingId}
+                        onPlayPress={playRecording}
+                        onDeletePress={deleteRecording}
+                        onEvaluatePress={evaluateRecording}
+                        formatTimestamp={formatTimestamp}
+                        isEvaluating={evaluatingRecordingId === recording.id}
+                     />
                      ))}
                   </View>
                )}

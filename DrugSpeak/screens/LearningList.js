@@ -76,27 +76,21 @@ const LearningListScreen = ({ navigation }) => {
          try {
             const studyRecord = await RecordService.getStudyRecordById(userData.id);
             
-            const remoteStats = {
-               currentLearning: studyRecord.currentLearning || 0,
-               finishedLearning: studyRecord.finishedLearning || 0,
-               totalScore: studyRecord.totalScore || 0
+            // Calculate stats based on learning list
+            const calculatedStats = {
+               currentLearning: currentLearning.length,
+               finishedLearning: finishedLearning.length
             };
             
-            if (remoteStats.currentLearning !== currentLearning.length || 
-               remoteStats.finishedLearning !== finishedLearning.length) {
+            // Only update backend if counts have changed
+            if (calculatedStats.currentLearning !== studyRecord.currentLearning || 
+                  calculatedStats.finishedLearning !== studyRecord.finishedLearning) {
                
-               const updatedStats = {
-                  currentLearning: currentLearning.length,
-                  finishedLearning: finishedLearning.length,
-                  totalScore: remoteStats.totalScore 
-               };
-               
-               await RecordService.upsertStudyRecord(updatedStats);
-               setStudyStats(updatedStats);
-               console.log('Remote stats updated with local counts:', updatedStats);
-            } else {
-               setStudyStats(remoteStats);
+               await RecordService.upsertStudyRecord(calculatedStats);
             }
+            
+            setStudyStats(calculatedStats);
+            
          } catch (error) {
             if (error.message === "Study record not found for this user." || 
                   (error.response && error.response.status === 404)) {
@@ -105,8 +99,7 @@ const LearningListScreen = ({ navigation }) => {
                
                const newStats = {
                   currentLearning: currentLearning.length,
-                  finishedLearning: finishedLearning.length,
-                  totalScore: 0 
+                  finishedLearning: finishedLearning.length
                };
                
                await RecordService.upsertStudyRecord(newStats);
@@ -238,9 +231,7 @@ const LearningListScreen = ({ navigation }) => {
                ListHeaderComponent={() => (
                   <View style={{ paddingBottom: 100 }}>
                      <StatsBar 
-                        currentCount={currentLearning.length}
-                        finishedCount={finishedLearning.length}
-                        totalScore={studyStats.totalScore}
+                     learningList={learningList}
                      />
                      
                      <ExpandableSectionHeader

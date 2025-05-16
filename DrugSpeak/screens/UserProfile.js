@@ -243,10 +243,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             <SectionHeader title="Study Statistics" />
             
             <StatsBar 
-               currentCount={currentLearningCount}
-               finishedCount={finishedLearningCount}
-               totalScore={studyStats.totalScore}
-               style={styles.statsBar}
+               learningList={learningList}
             />
          </ContentSection>
          

@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { getDrugsByCategory, categoryArray } from '../data/drugs';
 import DrugCard from '../components/DrugCard';
 import Header from '../components/Header';
-import ReusableFlatList from '../components/ReusableFlatlist';
+import ReusableFlatList from '../components/ReusableFlatList';
 import { Colors } from '../constants/color';
 
 const DrugListScreen = ({ route, navigation }) => {
