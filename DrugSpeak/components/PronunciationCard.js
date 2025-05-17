@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, TouchableOpacity, Text, Modal } from 'react-native';
 import { Audio } from 'expo-av';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import FAIcon from 'react-native-vector-icons/FontAwesome5';
@@ -11,6 +11,8 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
    const [sound, setSound] = useState(null);
    const [isPlaying, setIsPlaying] = useState(false);
    const [isLoading, setIsLoading] = useState(false);
+   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
+   const speedButtonRef = useRef(null);
    
    const DROPDOWN_WIDTH = 80;
 
@@ -86,6 +88,18 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
       onToggleDropdown(null);
    };
 
+   const measureDropdownPosition = () => {
+      if (speedButtonRef.current) {
+         speedButtonRef.current.measure((x, y, width, height, pageX, pageY) => {
+            setDropdownPosition({
+               x: pageX,
+               y: pageY + height
+            });
+            onToggleDropdown(id);
+         });
+      }
+   };
+   
    return (
       <View
          style={{
@@ -98,7 +112,6 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
             borderBottomWidth: Borders.width.thin,
             borderBottomColor: Colors.border,
             ...Shadows.glassSmall,
-            zIndex: isDropdownOpen ? 10 : 1 
          }}
       >
          <TouchableOpacity 
@@ -140,14 +153,9 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
             />
          </View>
 
-         <View
-            style={{
-               position: 'relative',
-               marginLeft: Spacing.sm,
-               zIndex: 2 
-            }}
-         >
+         <View style={{ position: 'relative', marginLeft: Spacing.sm }}>
             <TouchableOpacity
+               ref={speedButtonRef}
                style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -161,33 +169,38 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
                   backgroundColor: 'white',
                   width: DROPDOWN_WIDTH, 
                }}
-               onPress={() => onToggleDropdown(id)}
+               onPress={measureDropdownPosition}
             >
-               <Text
-                  style={{
-                     color: Colors.textSecondary,
-                     fontSize: Typography.sizes.small,
-                  }}
-               >
+               <Text style={{ color: Colors.textSecondary, fontSize: Typography.sizes.small }}>
                   {selectedSpeed}x
                </Text>
                <Icon name="arrow-drop-down" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
+         </View>
 
-            {isDropdownOpen && (
+         <Modal
+            transparent={true}
+            visible={isDropdownOpen}
+            onRequestClose={() => onToggleDropdown(null)}
+            animationType="none"
+         >
+            <TouchableOpacity 
+               style={{ flex: 1 }}
+               activeOpacity={1}
+               onPress={() => onToggleDropdown(null)}
+            >
                <View
                   style={{
                      position: 'absolute',
-                     top: '100%',
-                     right: 0,
+                     top: dropdownPosition.y,
+                     left: dropdownPosition.x,
                      backgroundColor: 'white',
                      borderWidth: Borders.width.thin,
                      borderColor: Colors.border,
                      borderRadius: Borders.radius.small,
-                     zIndex: 1000, 
-                     elevation: 5,   
                      ...Shadows.medium, 
-                     width: DROPDOWN_WIDTH, 
+                     width: DROPDOWN_WIDTH,
+                     elevation: 8,
                   }}
                >
                   {['0.25', '0.5', '0.75', '1.0', '1.25', '1.5', '2.0'].map((speed) => (
@@ -214,8 +227,8 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
                      </TouchableOpacity>
                   ))}
                </View>
-            )}
-         </View>
+            </TouchableOpacity>
+         </Modal>
       </View>
    );
 };
