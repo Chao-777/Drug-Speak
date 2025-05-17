@@ -11,29 +11,40 @@ const FormInput = ({
    keyboardType = 'default',
    autoCapitalize = 'sentences',
    editable = true,
+   error = '',
    style
 }) => {
    return (
-      <View style={style}>
+      <View style={[styles.container, style]}>
          <Text style={styles.label}>{label}</Text>
          <TextInput
-         style={styles.input}
-         value={value}
-         onChangeText={onChangeText}
-         placeholder={placeholder}
-         secureTextEntry={secureTextEntry}
-         keyboardType={keyboardType}
-         autoCapitalize={autoCapitalize}
-         editable={editable}
+            style={[
+               styles.input,
+               error ? styles.inputError : null,
+               !editable ? styles.disabledInput : null
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            secureTextEntry={secureTextEntry}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            editable={editable}
          />
+         {error ? (
+            <Text style={styles.errorText}>{error}</Text>
+         ) : null}
       </View>
    );
 };
 
 const styles = StyleSheet.create({
+   container: {
+      marginBottom: Spacing.md,
+   },
    label: {
       fontSize: Typography.sizes.body,
-      color: Typography.textPrimary,
+      color: Colors.textPrimary,
       marginTop: Spacing.sm,
       marginBottom: Spacing.xs,
    },
@@ -43,7 +54,22 @@ const styles = StyleSheet.create({
       padding: Spacing.md,
       fontSize: Typography.sizes.body,
       color: Colors.textPrimary,
-      marginBottom: Spacing.md,
+      borderWidth: 1,
+      borderColor: 'transparent',
+   },
+   inputError: {
+      borderColor: Colors.error,
+      backgroundColor: Colors.error + '05',
+   },
+   disabledInput: {
+      backgroundColor: '#f5f5f5',
+      color: Colors.textSecondary,
+   },
+   errorText: {
+      color: Colors.error,
+      fontSize: Typography.sizes.small,
+      marginTop: -Spacing.xs,
+      marginLeft: Spacing.xs,
    },
 });
 

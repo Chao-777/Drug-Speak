@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, Text, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, TouchableOpacity, Text, Alert, AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider } from 'react-redux';
@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { store, persistor } from './store';
 import { Colors, Typography, Spacing } from './constants/color';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import CategoriesScreen from './screens/DrugCategories';
 import DrugListScreen from './screens/DrugList';
 import DrugDetailScreen from './screens/DrugDetail';
@@ -19,10 +19,14 @@ import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
 import UserProfileScreen from './screens/UserProfile';
 import AuthService from './api/authService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import UserService from './api/userService';
+import LearningDataService from './api/learningDataService';
 import * as SplashScreen from 'expo-splash-screen';
 import LoadingIndicator from './components/LoadingIndicator';
 import EmptyState from './components/EmptyState';
+import AudioRecorderManager from './services/AudioRecorderManager';
+import RecordService from './api/recordService';
+import { setLearningList } from './store/learningListSlice';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,15 +43,14 @@ const PlaceholderScreen = ({ title }) => (
 const Stack = createStackNavigator();
 const ProfileStack = createStackNavigator();
 
-// Define common header styles for all navigators
 const headerOptions = {
   headerStyle: {
-    backgroundColor: 'white', // Changed to white background
+    backgroundColor: 'white',
   },
-  headerTintColor: Colors.textPrimary, // Changed to primary text color
+  headerTintColor: Colors.textPrimary,
   headerTitleStyle: {
     fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary, // Ensure text color is primary
+    color: Colors.textPrimary,
   },
   headerTitleAlign: 'left',
 };
@@ -57,27 +60,37 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
   
   const [recordingsBadge, setRecordingsBadge] = useState(0);
+  const dispatch = useDispatch();
+  
+  useEffect(() => {
+    if (isLoggedIn) {
+      const loadData = async () => {
+        try {
+          const user = await AuthService.getCurrentUser();
+          if (user) {
+            const userId = user.id || user._id;
+            const learningData = await LearningDataService.loadLearningList(userId);
+            if (learningData && learningData.length > 0) {
+              dispatch(setLearningList(learningData));
+            }
+          }
+        } catch (error) {
+          // Error handling
+        }
+      };
+      loadData();
+    }
+  }, [isLoggedIn, dispatch]);
   
   useEffect(() => {
     const loadRecordingCounts = async () => {
       try {
         if (!isLoggedIn) return;
         
-        let totalRecordings = 0;
-        
-        for (const drug of learningList.filter(d => d.status === 'current')) {
-          const storageKey = `recordings_${drug.id}`;
-          const savedRecordings = await AsyncStorage.getItem(storageKey);
-          
-          if (savedRecordings) {
-            const recordings = JSON.parse(savedRecordings);
-            totalRecordings += recordings.length;
-          }
-        }
-        
-        setRecordingsBadge(totalRecordings > 0 ? totalRecordings : 0);
+        const counts = await UserService.getRecordingCounts();
+        setRecordingsBadge(counts.total || 0);
       } catch (error) {
-        console.error('Error loading recording counts for badge:', error);
+        // Error handling
       }
     };
     
@@ -90,7 +103,8 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
         "Login Required",
         "You need to be logged in to access the Learning section.",
         [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign In", onPress: () => setActiveTab('profile') }
         ]
       );
     } else {
@@ -204,50 +218,88 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   );
 };
 
-
-const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn }) => {
-  return (
-    <ProfileStack.Navigator screenOptions={headerOptions}>
-      {isLoggedIn ? (
-        <>
-          <ProfileStack.Screen 
-            name="UserProfile" 
-            component={props => <UserProfileScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
-            options={{
-              title: '',
-            }}
-          />
-        </>
-      ) : (
-        <>
-          <ProfileStack.Screen 
-            name="SignIn" 
-            component={props => <SignInScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
-            options={{ title: '' }}
-          />
-          <ProfileStack.Screen 
-            name="SignUp" 
-            component={props => <SignUpScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
-            options={{ title: '' }}
-          />
-        </>
-      )}
-    </ProfileStack.Navigator>
-  );
+const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn, authStateKey }) => {
+  const navigationKey = `profile-stack-${isLoggedIn ? 'user' : 'auth'}-${authStateKey}`;
+  
+  if (isLoggedIn) {
+    return (
+      <ProfileStack.Navigator 
+        key={navigationKey} 
+        screenOptions={headerOptions}
+      >
+        <ProfileStack.Screen 
+          name="UserProfile" 
+          options={{ title: '' }}
+        >
+          {props => <UserProfileScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
+        </ProfileStack.Screen>
+      </ProfileStack.Navigator>
+    );
+  } else {
+    return (
+      <ProfileStack.Navigator 
+        key={navigationKey} 
+        screenOptions={headerOptions}
+      >
+        <ProfileStack.Screen 
+          name="SignIn" 
+          options={{ title: '' }}
+        >
+          {props => <SignInScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
+        </ProfileStack.Screen>
+        <ProfileStack.Screen 
+          name="SignUp" 
+          options={{ title: '' }}
+        >
+          {props => <SignUpScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
+        </ProfileStack.Screen>
+      </ProfileStack.Navigator>
+    );
+  }
 };
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('drugs');
   const [isLoggedIn, setIsLoggedInState] = useState(false);
   const [loading, setLoading] = useState(true);
+  const appState = useRef(AppState.currentState);
+  const navigationRef = useRef();
+  const authStateKey = useRef(0);
+  const dispatch = useDispatch();
+  
+  const loadLearningData = async () => {
+    try {
+      const user = await AuthService.getCurrentUser();
+      if (!user) {
+        return;
+      }
+      
+      const userId = user.id || user._id;
+      const learningList = await LearningDataService.loadLearningList(userId);
+      
+      if (learningList && learningList.length > 0) {
+        dispatch(setLearningList(learningList));
+      }
+    } catch (error) {
+      // Error handling
+    }
+  };
 
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
         const isAuthenticated = await AuthService.isLoggedIn();
         setIsLoggedInState(isAuthenticated);
+        
+        if (isAuthenticated) {
+          try {
+            await AuthService.refreshUserData();
+            await loadLearningData();
+          } catch (refreshError) {
+            // Not critical, continue
+          }
+        }
       } catch (error) {
-        console.error('Error checking login status:', error);
         setIsLoggedInState(false);
       } finally {
         setLoading(false);
@@ -255,10 +307,52 @@ const MainApp = () => {
     };
     
     checkLoginStatus();
+    
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        checkLoginStatus();
+      }
+      
+      appState.current = nextAppState;
+    });
+    
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
-  const setIsLoggedIn = (status) => {
-    setIsLoggedInState(status);
+  const setIsLoggedIn = async (status) => {
+    if (status === false && isLoggedIn === true) {
+      setIsLoggedInState(false);
+      authStateKey.current += 1;
+      setActiveTab('drugs');
+    } else if (status === true && isLoggedIn === false) {
+      setIsLoggedInState(true);
+      authStateKey.current += 1;
+      setActiveTab('profile');
+      
+      setTimeout(async () => {
+        try {
+          const userData = await AuthService.refreshUserData();
+          if (userData) {
+            try {
+              await RecordService.getStudyRecordById(userData.id || userData._id);
+              await loadLearningData();
+            } catch (recordError) {
+              // Not critical
+            }
+          }
+        } catch (refreshError) {
+          // Not showing 404 errors
+        }
+      }, 1000);
+    } else {
+      setIsLoggedInState(status);
+      authStateKey.current += 1;
+    }
   };
 
   if (loading) {
@@ -278,7 +372,7 @@ const MainApp = () => {
             <Stack.Screen
               name="DrugList" 
               component={DrugListScreen} 
-              options={{ title:'Drug List'}}
+              options={{ title: 'Drug List'}}
             />
             <Stack.Screen 
               name="DrugDetail" 
@@ -300,9 +394,7 @@ const MainApp = () => {
               <Stack.Screen 
                 name="LearningScreen" 
                 component={LearningScreen} 
-                options={({ route }) => ({ 
-                    title: '' 
-                })}
+                options={{ title: '' }}
               />
             </Stack.Navigator>
           );
@@ -323,7 +415,7 @@ const MainApp = () => {
         );
       
       case 'profile':
-        return <ProfileNavigator isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />;
+        return <ProfileNavigator isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} authStateKey={authStateKey.current} />;
       
       default:
         return null;
@@ -336,7 +428,7 @@ const MainApp = () => {
       <CustomTabBar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        isLoggedIn={isLoggedIn} 
+        isLoggedIn={isLoggedIn}
       />
     </View>
   );
@@ -348,12 +440,9 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        await Promise.all([
-          AuthService.isLoggedIn(),
-          new Promise(resolve => setTimeout(resolve, 2000)),
-        ]);
+        await AuthService.isLoggedIn();
       } catch (e) {
-        console.warn('Error during app initialization:', e);
+        // Error handling
       } finally {
         setAppIsReady(true);
       }
@@ -367,7 +456,7 @@ export default function App() {
       try {
         await SplashScreen.hideAsync();
       } catch (e) {
-        console.warn('Error hiding splash screen:', e);
+        // Error handling
       }
     }
   }, [appIsReady]);

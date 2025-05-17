@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors, Typography, Spacing } from '../constants/color';
 
 const StatItem = ({ label, value, color }) => (
@@ -18,6 +18,7 @@ const StatsBar = ({
    currentCount,
    finishedCount,
    totalScore,
+   isSyncing = false,
    style 
 }) => {
    // Calculate stats from learning list only if learningList is provided
@@ -84,6 +85,13 @@ const StatsBar = ({
             value={displayTotalScore} 
             color={Colors.secondary} 
          />
+         
+         {isSyncing && (
+            <View style={styles.syncIndicator}>
+               <ActivityIndicator size="small" color={Colors.primary} />
+               <Text style={styles.syncText}>Syncing</Text>
+            </View>
+         )}
       </View>
    );
 };
@@ -100,6 +108,7 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.1,
       shadowRadius: 3,
       elevation: 3,
+      position: 'relative',
    },
    statItemContainer: {
       flex: 1,
@@ -118,6 +127,22 @@ const styles = StyleSheet.create({
       width: 1,
       backgroundColor: Colors.border,
       marginHorizontal: Spacing.sm,
+   },
+   syncIndicator: {
+      position: 'absolute',
+      right: 5,
+      top: 5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.8)',
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+   },
+   syncText: {
+      fontSize: Typography.sizes.small,
+      color: Colors.textSecondary,
+      marginLeft: 4,
    }
 });
 

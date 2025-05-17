@@ -9,6 +9,10 @@ export const learningListSlice = createSlice({
    name: 'learningList',
    initialState,
    reducers: {
+      setLearningList: (state, action) => {
+         // Replace entire learning list with provided data
+         state.learningList = action.payload;
+      },
       addToLearningList: (state, action) => {
          if (!state.learningList.some(drug => drug.id === action.payload.id)) {
             const drugWithStatus = {
@@ -50,6 +54,7 @@ export const learningListSlice = createSlice({
 });
 
 export const { 
+   setLearningList,
    addToLearningList, 
    removeFromLearningList,
    updateLearningStatus 

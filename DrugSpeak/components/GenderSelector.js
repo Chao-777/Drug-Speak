@@ -6,48 +6,68 @@ const GenderSelector = ({
    selectedGender, 
    onSelectGender, 
    disabled = false,
+   error = '',
    style
    }) => {
    return (
-      <View style={[styles.genderContainer, style]}>
-         <TouchableOpacity
-         style={[
-            styles.genderButton,
-            selectedGender === 'male' && styles.genderButtonSelected,
-            disabled && styles.disabledButton
-         ]}
-         onPress={() => onSelectGender('male')}
-         disabled={disabled}
-         >
-         <Text style={[
-            styles.genderButtonText,
-            selectedGender === 'male' && styles.genderButtonTextSelected
-         ]}>Male</Text>
-         </TouchableOpacity>
+      <View style={[styles.container, style]}>
+         <View style={[
+            styles.genderContainer, 
+            error ? styles.genderContainerError : null
+         ]}>
+            <TouchableOpacity
+               style={[
+                  styles.genderButton,
+                  selectedGender === 'male' && styles.genderButtonSelected,
+                  disabled && styles.disabledButton
+               ]}
+               onPress={() => onSelectGender('male')}
+               disabled={disabled}
+            >
+               <Text style={[
+                  styles.genderButtonText,
+                  selectedGender === 'male' && styles.genderButtonTextSelected
+               ]}>Male</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+               style={[
+                  styles.genderButton,
+                  selectedGender === 'female' && styles.genderButtonSelected,
+                  disabled && styles.disabledButton
+               ]}
+               onPress={() => onSelectGender('female')}
+               disabled={disabled}
+            >
+               <Text style={[
+                  styles.genderButtonText,
+                  selectedGender === 'female' && styles.genderButtonTextSelected
+               ]}>Female</Text>
+            </TouchableOpacity>
+         </View>
          
-         <TouchableOpacity
-         style={[
-            styles.genderButton,
-            selectedGender === 'female' && styles.genderButtonSelected,
-            disabled && styles.disabledButton
-         ]}
-         onPress={() => onSelectGender('female')}
-         disabled={disabled}
-         >
-         <Text style={[
-            styles.genderButtonText,
-            selectedGender === 'female' && styles.genderButtonTextSelected
-         ]}>Female</Text>
-         </TouchableOpacity>
+         {error ? (
+            <Text style={styles.errorText}>{error}</Text>
+         ) : null}
       </View>
    );
 };
 
 const styles = StyleSheet.create({
+   container: {
+      marginBottom: Spacing.md,
+   },
    genderContainer: {
       flexDirection: 'row',
       justifyContent: 'flex-start',
-      marginBottom: Spacing.md,
+      paddingVertical: Spacing.xs,
+      borderRadius: 4,
+   },
+   genderContainerError: {
+      backgroundColor: Colors.error + '05',
+      borderWidth: 1,
+      borderColor: Colors.error,
+      padding: Spacing.xs,
    },
    genderButton: {
       backgroundColor: '#ECECEC',
@@ -73,6 +93,12 @@ const styles = StyleSheet.create({
    },
    disabledButton: {
       opacity: 0.7,
+   },
+   errorText: {
+      color: Colors.error,
+      fontSize: Typography.sizes.small,
+      marginTop: Spacing.xs,
+      marginLeft: Spacing.xs,
    },
 });
 

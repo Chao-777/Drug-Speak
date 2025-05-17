@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Spacing, Typography, Borders } from '../constants/color';
+import { Colors, Spacing, Typography } from '../constants/color';
 
 const RecordingItem = ({ 
   recording, 

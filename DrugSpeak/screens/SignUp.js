@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Spacing } from '../constants/color';
+import { View, StyleSheet, Text } from 'react-native';
+import { Colors, Spacing, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 
 import FormContainer from '../components/FormContainer';
@@ -14,29 +14,76 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const [userName, setUserName] = useState('');
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
+   const [confirmPassword, setConfirmPassword] = useState('');
    const [gender, setGender] = useState('');
    const [loading, setLoading] = useState(false);
+   const [validationErrors, setValidationErrors] = useState({});
+   const [error, setError] = useState('');
+
+   const validateForm = () => {
+      const errors = {};
+      
+      // Username validation
+      if (!userName) {
+         errors.userName = 'Username is required';
+      } else if (userName.length < 3) {
+         errors.userName = 'Username must be at least 3 characters';
+      }
+      
+      // Email validation
+      if (!email) {
+         errors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(email)) {
+         errors.email = 'Please enter a valid email';
+      }
+      
+      // Password validation
+      if (!password) {
+         errors.password = 'Password is required';
+      } else if (password.length < 6) {
+         errors.password = 'Password must be at least 6 characters';
+      }
+      
+      // Confirm password validation
+      if (!confirmPassword) {
+         errors.confirmPassword = 'Please confirm your password';
+      } else if (confirmPassword !== password) {
+         errors.confirmPassword = 'Passwords do not match';
+      }
+      
+      // Gender validation
+      if (!gender) {
+         errors.gender = 'Please select a gender';
+      }
+      
+      setValidationErrors(errors);
+      return Object.keys(errors).length === 0;
+   };
 
    const handleSignUp = async () => {
-      if (!userName || !email || !password || !gender) {
-         alert('Please fill in all fields');
+      setError('');
+      
+      if (!validateForm()) {
          return;
       }
       
       setLoading(true);
       try {
-         await AuthService.register({
+         const result = await AuthService.register({
             username: userName,
             email,
             password,
             gender,
          });
-      
-         alert('Signup successful!');
+         
+         // Save email for easier sign in next time
+         await AuthService.saveLastEmail(email);
+         
+         // Success!
          setIsLoggedIn(true);
-         } catch (error) {
-         alert(error.message);
-         } finally {
+      } catch (error) {
+         setError(error.message || 'Registration failed. Please try again.');
+      } finally {
          setLoading(false);
       }
    };
@@ -45,7 +92,10 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
       setUserName('');
       setEmail('');
       setPassword('');
+      setConfirmPassword('');
       setGender('');
+      setValidationErrors({});
+      setError('');
    };
 
    const navigateToSignIn = () => {
@@ -56,63 +106,91 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
       <FormContainer>
          <FormTitle title="Sign up a New User" />
          
+         {error ? (
+            <View style={styles.errorContainer}>
+               <Text style={styles.errorText}>{error}</Text>
+            </View>
+         ) : null}
+         
          <FormInput
             label="User Name"
             value={userName}
-            onChangeText={setUserName}
+            onChangeText={(text) => {
+               setUserName(text);
+               setValidationErrors(prev => ({...prev, userName: ''}));
+            }}
             placeholder="Enter your name"
             editable={!loading}
+            error={validationErrors.userName}
          />
          
-         <FormInput
-            label="Gender"
-            value=""
-            onChangeText={() => {}}
-            placeholder=""
-            editable={false}
-            style={{ marginBottom: 0 }}
-         />
+
          
          <GenderSelector
             selectedGender={gender}
-            onSelectGender={setGender}
+            onSelectGender={(value) => {
+               setGender(value);
+               setValidationErrors(prev => ({...prev, gender: ''}));
+            }}
             disabled={loading}
+            error={validationErrors.gender}
          />
          
          <FormInput
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+               setEmail(text);
+               setValidationErrors(prev => ({...prev, email: ''}));
+            }}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
+            error={validationErrors.email}
          />
          
          <FormInput
             label="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+               setPassword(text);
+               setValidationErrors(prev => ({...prev, password: ''}));
+            }}
             placeholder="Create a password"
             secureTextEntry
             editable={!loading}
+            error={validationErrors.password}
+         />
+         
+         <FormInput
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={(text) => {
+               setConfirmPassword(text);
+               setValidationErrors(prev => ({...prev, confirmPassword: ''}));
+            }}
+            placeholder="Confirm your password"
+            secureTextEntry
+            editable={!loading}
+            error={validationErrors.confirmPassword}
          />
          
          <View style={styles.buttonContainer}>
             <SecondaryButton
-            title="Clear"
-            icon="clear"  
-            onPress={handleClear}
-            disabled={loading}
-            style={styles.clearButton}
-         />
+               title="Clear"
+               icon="clear"  
+               onPress={handleClear}
+               disabled={loading}
+               style={styles.clearButton}
+            />
          
-         <PrimaryButton
-            title="Sign Up"
-            icon="person-add"  
-            onPress={handleSignUp}
-            loading={loading}
-            disabled={loading}
+            <PrimaryButton
+               title="Sign Up"
+               icon="person-add"  
+               onPress={handleSignUp}
+               loading={loading}
+               disabled={loading}
             />
          </View>
          
@@ -133,6 +211,17 @@ const styles = StyleSheet.create({
    },
    clearButton: {
       marginRight: Spacing.md,
+   },
+   errorContainer: {
+      backgroundColor: Colors.error + '20',
+      borderRadius: 5,
+      padding: Spacing.sm,
+      marginBottom: Spacing.md,
+   },
+   errorText: {
+      color: Colors.error,
+      fontSize: Typography.sizes.body,
+      textAlign: 'center',
    },
 });
 

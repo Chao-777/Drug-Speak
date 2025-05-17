@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, SafeAreaView, View, Text, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { removeFromLearningList, updateLearningStatus } from '../store/learningListSlice';
+import { removeFromLearningList, updateLearningStatus, updateDrugScore } from '../store/learningListSlice';
 import { drugCategory } from '../data/resource';
 import RecordService from '../api/recordService';
+import AuthService from '../api/authService';
 import { Colors, Typography, Spacing } from '../constants/color';
 import PronunciationCard from '../components/PronunciationCard';
 import DrugHeader from '../components/DrugHeader';
@@ -16,8 +16,6 @@ import RecordingItem from '../components/RecordingItem';
 import BottomActionBar from '../components/BottomActionBar';
 import AudioRecorderManager from '../services/AudioRecorderManager';
 import AudioComparisonService from '../services/AudioComparisonService';
-import { updateDrugScore } from '../store/learningListSlice';
-
 
 const LearningScreen = ({ route, navigation }) => {
    const { drug } = route.params;
@@ -31,11 +29,12 @@ const LearningScreen = ({ route, navigation }) => {
       totalScore: 0
    });
    const [userData, setUserData] = useState(null);
-      const [recording, setRecording] = useState();
+   const [recording, setRecording] = useState();
    const [isRecording, setIsRecording] = useState(false);
    const [recordings, setRecordings] = useState([]);
    const [sound, setSound] = useState(null);
    const [playingRecordingId, setPlayingRecordingId] = useState(null);
+   const [isUploading, setIsUploading] = useState(false);
 
    const currentLearning = learningList.filter(item => item.status === 'current');
    const finishedLearning = learningList.filter(item => item.status === 'finished');
@@ -45,87 +44,89 @@ const LearningScreen = ({ route, navigation }) => {
    const [evaluatingRecordingId, setEvaluatingRecordingId] = useState(null);
    const [isUpdatingStats, setIsUpdatingStats] = useState(false);
    const [drugScore, setDrugScore] = useState(0);
-
    
-    // Modify the evaluateRecording function to properly handle score updates
+   // Evaluate recording and update score
    const evaluateRecording = async (recordingId) => {
       try {
-      setEvaluatingRecordingId(recordingId);
-      
-      const recordingToEvaluate = recordings.find(rec => rec.id === recordingId);
-      if (!recordingToEvaluate) {
-         throw new Error('Recording not found');
-      }
-      
-      // Get reference audio to compare with
-      const instructorAudio = drug.sounds && drug.sounds.length > 0 
-         ? drug.sounds[0].file 
-         : null;
+         setEvaluatingRecordingId(recordingId);
          
-      if (!instructorAudio) {
-         throw new Error('No reference audio available for comparison');
-      }
-      
-      // Stop any currently playing audio
-      await stopAnyPlayback();
-      
-      // Compare the audio files and get a score
-      const score = await AudioComparisonService.compareAudio(
-         recordingToEvaluate.uri,
-         instructorAudio
-      );
-      
-      // Update the recording with the new score
-      const updatedRecordings = recordings.map(rec => 
-         rec.id === recordingId 
-            ? { ...rec, score } 
-            : rec
-      );
-      
-      setRecordings(updatedRecordings);
-      
-      // Get previous highest score for this drug
-      const previousHighestScore = drugScore || 0;
-      
-      // If this new score is higher than the previous highest
-      if (score > previousHighestScore) {
-         // Update local drug score
-         setDrugScore(score);
+         const recordingToEvaluate = recordings.find(rec => rec.id === recordingId);
+         if (!recordingToEvaluate) {
+            throw new Error('Recording not found');
+         }
          
-         // Update in Redux store
-         dispatch(updateDrugScore({
-            id: drug.id,
-            score: score
-         }));
-      }
-      
-      // Save the updated recordings
-      await saveRecordings(updatedRecordings);
-      
-      // Alert the user of their score
-      Alert.alert(
-         "Evaluation Complete",
-         `Your pronunciation score: ${score}${score > previousHighestScore ? "\n\nThis is a new high score!" : ""}`
-      );
-      
+         // Get reference audio to compare with
+         const instructorAudio = drug.sounds && drug.sounds.length > 0 
+            ? drug.sounds[0].file 
+            : null;
+            
+         if (!instructorAudio) {
+            throw new Error('No reference audio available for comparison');
+         }
+         
+         // Stop any currently playing audio
+         await stopAnyPlayback();
+         
+         // Compare the audio files and get a score
+         const score = await AudioComparisonService.compareAudio(
+            recordingToEvaluate.uri,
+            instructorAudio
+         );
+         
+         // Update the recording with the new score
+         const updatedRecordings = recordings.map(rec => 
+            rec.id === recordingId 
+               ? { ...rec, score } 
+               : rec
+         );
+         
+         setRecordings(updatedRecordings);
+         
+         // Get previous highest score for this drug
+         const previousHighestScore = drugScore || 0;
+         
+         // If this new score is higher than the previous highest
+         if (score > previousHighestScore) {
+            // Update local drug score
+            setDrugScore(score);
+            
+            // Update in Redux store
+            dispatch(updateDrugScore({
+               id: drug.id,
+               score: score
+            }));
+            
+            // Update the study record on the backend
+            await updateStudyRecordStats();
+         }
+         
+         // Save the updated recordings
+         await saveRecordings(updatedRecordings);
+         
+         // Alert the user of their score
+         Alert.alert(
+            "Evaluation Complete",
+            `Your pronunciation score: ${score}${score > previousHighestScore ? "\n\nThis is a new high score!" : ""}`
+         );
       } catch (error) {
-      console.error('Error evaluating recording:', error);
-      Alert.alert('Error', error.message || 'Failed to evaluate recording');
+         console.error('Error evaluating recording:', error);
+         Alert.alert('Error', error.message || 'Failed to evaluate recording');
       } finally {
-      setEvaluatingRecordingId(null);
+         setEvaluatingRecordingId(null);
       }
    };
 
+   // Initialize data on component mount
    useEffect(() => {
       const loadData = async () => {
          try {
-            const userDataString = await AsyncStorage.getItem('userData');
-            if (userDataString) {
-               setUserData(JSON.parse(userDataString));
-               
-               const user = JSON.parse(userDataString);
+            // Get current user using AuthService
+            const user = await AuthService.getCurrentUser();
+            if (user) {
+               setUserData(user);
                
                try {
+                  // Fetch study record from backend
                   const record = await RecordService.getStudyRecordById(user.id);
                   if (record) {
                      setStudyStats({
@@ -140,6 +141,7 @@ const LearningScreen = ({ route, navigation }) => {
                      
                      console.log("No study record found. Creating a new one...");
                      
+                     // Create initial study record
                      const newStats = {
                         currentLearning: currentLearning.length,
                         finishedLearning: finishedLearning.length,
@@ -154,30 +156,54 @@ const LearningScreen = ({ route, navigation }) => {
                }
             }
          } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('Error loading user data:', error);
          }
       };
 
+      // Set initial drug score from learning list
       const drugInList = learningList.find(item => item.id === drug.id);
       if (drugInList && drugInList.score) {
          setDrugScore(drugInList.score);
       }
       
       loadData();
-      
       loadRecordings();
-      
       setupAudioRecording();
       
+      // Cleanup function
       return () => {
          if (recording) {
             recording.stopAndUnloadAsync();
          }
-         
          stopAnyPlayback();
       };
    }, []);
 
+   // Helper to update study record stats
+   const updateStudyRecordStats = async () => {
+      try {
+         const user = await AuthService.getCurrentUser();
+         if (!user) return;
+         
+         const stats = {
+            currentLearning: currentLearning.length,
+            finishedLearning: finishedLearning.length,
+            totalScore: calculateTotalScore()
+         };
+         
+         await RecordService.upsertStudyRecord(stats);
+         setStudyStats(stats);
+      } catch (error) {
+         console.error('Error updating study stats:', error);
+      }
+   };
+   
+   // Calculate total score across all drugs
+   const calculateTotalScore = () => {
+      return learningList.reduce((total, drug) => total + (drug.score || 0), 0);
+   };
+
+   // Audio recording setup
    const setupAudioRecording = async () => {
       try {
          await AudioRecorderManager.requestPermissions();
@@ -187,6 +213,7 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
+   // Load recordings from storage and backend
    const loadRecordings = async () => {
       try {
          const savedRecordings = await AudioRecorderManager.loadStoredRecordings(RECORDINGS_STORAGE_KEY);
@@ -197,6 +224,7 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
    
+   // Save recordings to storage and backend
    const saveRecordings = async (updatedRecordings) => {
       try {
          await AudioRecorderManager.saveRecordings(RECORDINGS_STORAGE_KEY, updatedRecordings);
@@ -206,6 +234,7 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
+   // Start recording audio
    const startRecording = async () => {
       try {
          await setupAudioRecording();
@@ -220,31 +249,59 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
+   // Stop recording audio and upload to server
    const stopRecording = async () => {
       try {
-         if (!recording) {
-            return;
-         }
+         if (!recording) return;
          
+         setIsUploading(true);
+         
+         // Stop the recording and get local URI
          const uri = await AudioRecorderManager.stopRecording(recording);
          
+         // Create recording metadata
+         const recordingId = Date.now().toString();
          const newRecording = {
-            id: Date.now().toString(),
+            id: recordingId,
             uri,
             timestamp: new Date().toISOString(),
-            evaluation: 'good', 
+            evaluation: 'pending',
+            uploaded: false
          };
          
+         // Update local state immediately for better UX
          const updatedRecordings = [...recordings, newRecording];
          setRecordings(updatedRecordings);
          
+         // Save to local storage first
          await saveRecordings(updatedRecordings);
+         
+         // Upload the audio file to the server
+         try {
+            const serverUrl = await AudioRecorderManager.uploadAudioFile(uri, drug.id, recordingId);
+            
+            // Update the recording with the server URL and uploaded status
+            const finalRecordings = updatedRecordings.map(rec => 
+               rec.id === recordingId 
+                  ? { ...rec, uri: serverUrl, uploaded: true } 
+                  : rec
+            );
+            
+            // Update state and save final version with server URL
+            setRecordings(finalRecordings);
+            await saveRecordings(finalRecordings);
+         } catch (uploadError) {
+            console.error('Error uploading recording to server:', uploadError);
+            // We'll keep the local URI if upload fails
+         }
          
          setRecording(undefined);
          setIsRecording(false);
       } catch (err) {
          console.error('Failed to stop recording', err);
          Alert.alert('Error', 'Failed to save recording');
+      } finally {
+         setIsUploading(false);
       }
    };
 
@@ -260,6 +317,7 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
+   // Play a recording, handling both local and server URIs
    const playRecording = async (recordingId) => {
       try {
          if (playingRecordingId === recordingId) {
@@ -275,7 +333,22 @@ const LearningScreen = ({ route, navigation }) => {
             return;
          }
          
-         const newSound = await AudioRecorderManager.playSound(recordingToPlay.uri);
+         let uri = recordingToPlay.uri;
+         
+         // If it's a server URL and not a local file path, download/cache it first
+         if (uri && uri.startsWith('http')) {
+            try {
+               uri = await AudioRecorderManager.downloadAudioFile(
+                  uri, 
+                  `drug_${drug.id}_recording_${recordingId}.m4a`
+               );
+            } catch (downloadError) {
+               console.error('Error downloading audio from server:', downloadError);
+               // Continue with original URI if download fails
+            }
+         }
+         
+         const newSound = await AudioRecorderManager.playSound(uri);
          
          newSound.setOnPlaybackStatusUpdate(status => {
             if (status.didJustFinish) {
@@ -286,16 +359,17 @@ const LearningScreen = ({ route, navigation }) => {
          setSound(newSound);
          setPlayingRecordingId(recordingId);
       } catch (err) {
-         console.error('Failed to play recording', err);
+         console.error('Failed to play recording:', err);
          Alert.alert('Error', 'Failed to play recording');
          setPlayingRecordingId(null);
       }
    };
 
+   // Delete a recording from both local storage and backend
    const deleteRecording = (recordingId) => {
       Alert.alert(
          "Delete Recording",
-         "Are you sure you want to delete this recording?",
+         "Are you sure you want to delete this recording? This will remove it from both your device and the cloud.",
          [
             {
                text: "Cancel",
@@ -306,14 +380,17 @@ const LearningScreen = ({ route, navigation }) => {
                style: "destructive",
                onPress: async () => {
                   try {
+                     // Stop playback if deleting currently playing recording
                      if (playingRecordingId === recordingId) {
                         await stopAnyPlayback();
                      }
                      
+                     // Delete the recording using the enhanced method
+                     await AudioRecorderManager.deleteRecording(RECORDINGS_STORAGE_KEY, recordingId);
+                     
+                     // Update local state
                      const updatedRecordings = recordings.filter(rec => rec.id !== recordingId);
                      setRecordings(updatedRecordings);
-                     
-                     await saveRecordings(updatedRecordings);
                   } catch (error) {
                      console.error('Error deleting recording:', error);
                      Alert.alert('Error', 'Failed to delete recording');
@@ -344,89 +421,44 @@ const LearningScreen = ({ route, navigation }) => {
       }).join(', ');
    };
 
+   // Mark drug as finished
    const handleFinish = async () => {
       try {
          setIsLoading(true);
          
+         // Update Redux state
          dispatch(updateLearningStatus({ id: drug.id, status: 'finished' }));
          
-         if (!userData) {
-            const userDataString = await AsyncStorage.getItem('userData');
-            if (userDataString) {
-               setUserData(JSON.parse(userDataString));
-            } else {
-               throw new Error('User data not found. Please log in again.');
-            }
-         }
-         
-         const updatedCurrentLearning = learningList.filter(
-            item => item.id !== drug.id && item.status === 'current'
-         ).length;
-         
-         const updatedFinishedLearning = learningList.filter(
-            item => (item.id === drug.id || item.status === 'finished')
-         ).length;
-         
-         const newStats = {
-            currentLearning: updatedCurrentLearning,
-            finishedLearning: updatedFinishedLearning
-         };
-         
-         await RecordService.upsertStudyRecord(newStats);
-         
-         setStudyStats({
-            ...studyStats,
-            currentLearning: newStats.currentLearning,
-            finishedLearning: newStats.finishedLearning
-         });
+         // Update backend study record
+         await updateStudyRecordStats();
          
          Alert.alert(
             "Success",
             `${drug.name} marked as finished!`,
             [{ text: "OK", onPress: () => navigation.goBack() }]
          );
-         } catch (error) {
+      } catch (error) {
          console.error('Error updating study record:', error);
          Alert.alert(
             "Error",
             error.message || "Failed to update study record",
             [{ text: "OK" }]
          );
-         } finally {
+      } finally {
          setIsLoading(false);
-         }
-      };
+      }
+   };
 
+   // Remove drug from learning list
    const handleRemove = async () => {
       try {
          setIsLoading(true);
          
-         const isCurrentDrug = drug.status === 'current';
-         const isFinishedDrug = drug.status === 'finished';
-         
+         // Update Redux state
          dispatch(removeFromLearningList(drug.id));
          
-         if (!userData) {
-            const userDataString = await AsyncStorage.getItem('userData');
-            if (userDataString) {
-               setUserData(JSON.parse(userDataString));
-            } else {
-               navigation.goBack();
-               return;
-            }
-         }
-         
-         const newStats = {
-            currentLearning: isCurrentDrug ? 
-               Math.max(0, studyStats.currentLearning - 1) : 
-               studyStats.currentLearning,
-            finishedLearning: isFinishedDrug ? 
-               Math.max(0, studyStats.finishedLearning - 1) : 
-               studyStats.finishedLearning,
-            totalScore: studyStats.totalScore 
-         };
-         
-         await RecordService.upsertStudyRecord(newStats);
+         // Update backend study record
+         await updateStudyRecordStats();
          
          navigation.goBack();
       } catch (error) {
@@ -491,6 +523,7 @@ const LearningScreen = ({ route, navigation }) => {
                   isRecording={isRecording} 
                   onPressIn={startRecording} 
                   onPressOut={stopRecording} 
+                  isLoading={isUploading}
                />
                
                {recordings.length > 0 && (
@@ -507,6 +540,7 @@ const LearningScreen = ({ route, navigation }) => {
                         onEvaluatePress={evaluateRecording}
                         formatTimestamp={formatTimestamp}
                         isEvaluating={evaluatingRecordingId === recording.id}
+                        isUploaded={recording.uploaded}
                      />
                      ))}
                   </View>
