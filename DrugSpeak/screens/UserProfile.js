@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text } from 'react-native';
 import { Colors, Spacing, Borders, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
@@ -14,7 +14,9 @@ import ContentSection from '../components/ContentSection';
 import StatsBar from '../components/StatsBar';
 import LabeledText from '../components/LabeledText';
 import FormModal from '../components/FormModal';
+import LoadingIndicator from '../components/LoadingIndicator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import UserDataHelper from '../utils/UserDataHelper';
 
 const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
@@ -39,9 +41,9 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
    const finishedLearningCount = learningList.filter(drug => drug.status === 'finished').length;
 
-   // Calculate total score from learning list
+   // Calculate total score from learning list using the helper
    const calculateTotalScore = () => {
-      return learningList.reduce((total, drug) => total + (drug.score || 0), 0);
+      return UserDataHelper.calculateTotalScore(learningList);
    };
 
    useEffect(() => {
@@ -51,8 +53,8 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             
             setSyncing(true);
             try {
-               const user = await AuthService.getCurrentUser();
-               if (user && user.id) {
+               const user = await UserDataHelper.getCurrentUserSafe();
+               if (user && (user.id || user._id)) {
                   const newStats = {
                      currentLearning: currentLearningCount,
                      finishedLearning: finishedLearningCount,
@@ -86,10 +88,9 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
       setError(null);
       
       try {
-         // First verify we have a token
-         const token = await AsyncStorage.getItem('userToken');
-         if (!token) {
-            console.log('No auth token found, cannot load profile');
+         // Check if user is logged in
+         const isLoggedIn = await UserDataHelper.isUserLoggedIn();
+         if (!isLoggedIn) {
             setError('Authentication required. Please log in again.');
             setLoading(false);
             return;
@@ -107,7 +108,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          } catch (refreshError) {
             console.error('Error fetching user profile:', refreshError);
             // If server refresh fails, fall back to cached data
-            const userData = await AuthService.getCurrentUser();
+            const userData = await UserDataHelper.getCurrentUserSafe();
             if (!userData) {
                throw new Error('User data not available. Please log in again.');
             }
@@ -116,10 +117,11 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          }
          
          // Now get the study record if we have a user
-         const userData = await AuthService.getCurrentUser();
-         if (userData && userData.id) {
+         const userData = await UserDataHelper.getCurrentUserSafe();
+         if (userData && (userData.id || userData._id)) {
             try {
-               const record = await RecordService.getStudyRecordById(userData.id);
+               const userId = userData.id || userData._id;
+               const record = await RecordService.getStudyRecordById(userId);
                
                const remoteStats = {
                   currentLearning: record.currentLearning || 0,
@@ -156,7 +158,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                      await RecordService.upsertStudyRecord(newStats);
                      setStudyStats(newStats);
                   } catch (createError) {
-                     console.log('Error creating new record, will use default stats:', createError);
+                     console.error('Error creating new record:', createError);
                   }
                } else {
                   console.error('Error loading study record:', error);
@@ -278,42 +280,36 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                      setUser(null);
                      
                      // Perform final sync before logout - use a special flag
-                     console.log('Performing final sync before logout...');
                      await AsyncStorage.setItem('finalSync', 'true');
                      
                      // Now sync any final data
                      try {
-                        const userData = await AuthService.getCurrentUser();
-                        if (userData && userData.id) {
+                        const userData = await UserDataHelper.getCurrentUserSafe();
+                        if (userData && (userData.id || userData._id)) {
                            const finalStats = {
                               currentLearning: currentLearningCount,
                               finishedLearning: finishedLearningCount,
                               totalScore: calculateTotalScore()
                            };
                            await RecordService.upsertStudyRecord(finalStats);
-                           console.log('Final sync completed successfully');
                         }
                      } catch (syncError) {
-                        console.log('Final sync skipped:', syncError.message);
+                        console.error('Final sync failed:', syncError.message);
                      }
                      
                      // Clear final sync flag
                      await AsyncStorage.removeItem('finalSync');
                      
                      // Add a delay to allow pending operations to complete
-                     console.log('Waiting for pending operations to complete before logout...');
                      await new Promise(resolve => setTimeout(resolve, 3000));
                      
                      // First log the user out
-                     console.log('Attempting to sign out');
                      const logoutSuccess = await AuthService.logout();
-                     console.log('Logout success:', logoutSuccess);
                      
                      // Add a short delay to ensure storage operations complete
                      setTimeout(() => {
                         // Then ensure UI is updated
                         if (setIsLoggedIn) {
-                           console.log('Setting isLoggedIn to false');
                            setIsLoggedIn(false);
                         }
                         // Loading indicator will be hidden in finally block
@@ -330,23 +326,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    };
 
    if (loading && !refreshing) {
-      return (
-         <View style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: Colors.background,
-         }}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={{
-               marginTop: Spacing.md,
-               fontSize: Typography.sizes.medium,
-               color: Colors.textSecondary,
-            }}>
-               Loading profile...
-            </Text>
-         </View>
-      );
+      return <LoadingIndicator.FullScreen message="Loading profile..." />;
    }
 
    if (error && !refreshing) {
@@ -364,7 +344,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             />
          }
       >
-         <Header title="User Profile" /   >
+         <Header title="User Profile" />
          
          <ContentSection style={styles.infoSection}>
             <LabeledText 

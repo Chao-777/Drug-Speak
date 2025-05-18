@@ -65,9 +65,7 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
       
       setLoading(true);
       try {
-         console.log(`Attempting to login with email: ${email}`);
          const result = await AuthService.login(email, password);
-         console.log('Login successful, user ID:', result.user?.id || 'unknown');
          
          // Save user's email for future logins
          await AuthService.saveLastEmail(email);

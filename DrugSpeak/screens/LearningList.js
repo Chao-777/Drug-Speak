@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, RefreshControl, SafeAreaView, FlatList, Alert, ActivityIndicator, Text } from 'react-native';
+import { View, RefreshControl, SafeAreaView, FlatList, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { Colors, Spacing, Typography } from '../constants/color';
+import { Colors, Spacing } from '../constants/color';
 import RecordService from '../api/recordService';
 import AuthService from '../api/authService';
 import DrugCard from '../components/DrugCard';
@@ -10,9 +10,11 @@ import {ExpandableSectionHeader} from '../components/SectionHeader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import StatsBar from '../components/StatsBar';
+import LoadingIndicator from '../components/LoadingIndicator';
 import { updateLearningStatus, removeFromLearningList, setLearningList } from '../store/learningListSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LearningDataService from '../api/learningDataService';
+import UserDataHelper from '../utils/UserDataHelper';
 
 const LearningListScreen = ({ navigation }) => {
    const learningList = useSelector(state => state.learningList.learningList || []);
@@ -36,29 +38,11 @@ const LearningListScreen = ({ navigation }) => {
    const [finishedExpanded, setFinishedExpanded] = useState(false);
 
    // Check if the user is logged in before making API calls
+   // Now using UserDataHelper instead of duplicating this logic
    const checkUserLoggedIn = async () => {
-      try {
-         // Check if this is a special final sync operation before logout 
-         const isFinalSync = await AsyncStorage.getItem('finalSync');
-         if (isFinalSync === 'true') {
-            return true;
-         }
-         
-         // Check if a logout operation is in progress
-         const isLoggingOut = await AsyncStorage.getItem('isLoggingOut');
-         if (isLoggingOut === 'true') {
-            setIsUserLoggedIn(false);
-            return false;
-         }
-         
-         const user = await AuthService.getCurrentUser();
-         const isLoggedIn = !!user;
-         setIsUserLoggedIn(isLoggedIn);
-         return isLoggedIn;
-      } catch (error) {
-         setIsUserLoggedIn(false);
-         return false;
-      }
+      const isLoggedIn = await UserDataHelper.isUserLoggedIn();
+      setIsUserLoggedIn(isLoggedIn);
+      return isLoggedIn;
    };
 
    useEffect(() => {
@@ -70,13 +54,13 @@ const LearningListScreen = ({ navigation }) => {
             
             setSyncing(true);
             try {
-               // Get user from AuthService instead of directly from AsyncStorage
-               const user = await AuthService.getCurrentUser();
+               // Use UserDataHelper.getCurrentUserSafe for consistent user data retrieval
+               const user = await UserDataHelper.getCurrentUserSafe();
                if (user) {
                   const newStats = {
                      currentLearning: currentLearning.length,
                      finishedLearning: finishedLearning.length,
-                     totalScore: calculateTotalScore()
+                     totalScore: UserDataHelper.calculateTotalScore(learningList)
                   };
                   
                   await RecordService.upsertStudyRecord(newStats);
@@ -93,9 +77,9 @@ const LearningListScreen = ({ navigation }) => {
       syncStats();
    }, [currentLearning.length, finishedLearning.length]);
 
-   // Calculate total score across all drugs
+   // Use UserDataHelper for consistent score calculation
    const calculateTotalScore = () => {
-      return learningList.reduce((total, drug) => total + (drug.score || 0), 0);
+      return UserDataHelper.calculateTotalScore(learningList);
    };
 
    const fetchStudyRecord = async () => {
@@ -103,19 +87,17 @@ const LearningListScreen = ({ navigation }) => {
          setLoading(true);
          setError(null);
          
-         // Check login status first
+         // Check login status first using the helper
          const isLoggedIn = await checkUserLoggedIn();
          if (!isLoggedIn) {
-            console.log('User not logged in, skipping study record fetch');
             setLoading(false);
             setRefreshing(false);
             return;
          }
          
-         // Get user from AuthService instead of directly from AsyncStorage
-         const user = await AuthService.getCurrentUser();
+         // Get user from helper for consistent error handling
+         const user = await UserDataHelper.getCurrentUserSafe();
          if (!user) {
-            console.warn('No user logged in to fetch study record');
             setLoading(false);
             setRefreshing(false);
             return;
@@ -388,24 +370,9 @@ const LearningListScreen = ({ navigation }) => {
       }
    }, [learningList]);
 
+   // Using our new shared LoadingIndicator component
    if (loading && !refreshing) {
-      return (
-         <View style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: Colors.background,
-         }}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={{
-               marginTop: Spacing.md,
-               fontSize: Typography.sizes.medium,
-               color: Colors.textSecondary,
-            }}>
-               Loading your study progress...
-            </Text>
-         </View>
-      );
+      return <LoadingIndicator.FullScreen message="Loading your study progress..." />;
    }
 
    if (error && !refreshing) {

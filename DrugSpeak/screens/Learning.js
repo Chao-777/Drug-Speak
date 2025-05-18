@@ -139,8 +139,6 @@ const LearningScreen = ({ route, navigation }) => {
                   if (error.message === "Study record not found for this user." || 
                         (error.response && error.response.status === 404)) {
                      
-                     console.log("No study record found. Creating a new one...");
-                     
                      // Create initial study record
                      const newStats = {
                         currentLearning: currentLearning.length,

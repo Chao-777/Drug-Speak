@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthService from './authService';
+import UserDataHelper from '../utils/UserDataHelper';
 
 // Storage keys
 const PENDING_RECORDS_KEY = 'pendingUploads';
@@ -21,53 +22,32 @@ const RecordService = {
             // First check if logout is in progress
             const isLoggingOut = await AsyncStorage.getItem('isLoggingOut');
             if (isLoggingOut === 'true') {
-               console.log('Logout in progress, skipping study record update');
                throw new Error('Operation aborted due to ongoing logout');
             }
-         } else {
-            console.log('Processing final sync operation before logout');
          }
          
          // First check for auth token
          const token = await AsyncStorage.getItem('userToken');
          if (!token) {
-            console.log('No auth token found, skipping study record update');
             throw new Error('Authentication required. Please log in again.');
          }
          
          // Get current user to include user ID with the request
          const user = await AuthService.getCurrentUser();
          if (!user) {
-            console.log('No user data found, skipping study record update');
             throw new Error('You need to be logged in to update your study record.');
          }
          
-         // Ensure consistent field naming for user information
-         // This makes sure both username and name fields are populated
-         const userName = user.username || user.name || user.email?.split('@')[0] || 'Anonymous';
+         // Use the helper function to create a consistent user data object with nested structure
+         const userData = UserDataHelper.createNestedUserObject(user);
          
-         // Add user ID and user information to the data
+         // Add user data and other fields to the record
          const recordData = {
             ...updateData,
-            userId: user.id || user._id,
-            // Ensure we always include user profile data with consistent field names
-            username: userName,
-            name: userName, // Add both fields for compatibility
-            email: user.email || '',
-            gender: user.gender || 'Not specified',
-            // Also include a nested user object with full profile information
-            user: {
-               id: user.id || user._id,
-               username: userName,
-               name: userName,
-               email: user.email || '',
-               gender: user.gender || 'Not specified'
-            },
+            ...userData,
             // Add any other relevant user fields
             updatedAt: new Date().toISOString()
           };
-          
-
           
           const response = await apiClient.post('/study-record', recordData);
           return response.data;
@@ -81,27 +61,14 @@ const RecordService = {
             throw new Error('Invalid study record data. Please check your inputs.');
          } else if (error.response?.status === 404) {
             // Create a default record if endpoint doesn't exist
-            console.log('Study record endpoint not implemented yet, using defaults');
             
             // When using defaults, still include the user information
             const user = await AuthService.getCurrentUser();
-            const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'Anonymous');
+            const userData = UserDataHelper.createNestedUserObject(user);
             
             return {
                ...updateData,
-               userId: user?.id || user?._id,
-               username: userName,
-               name: userName, // Add both fields for compatibility
-               email: user?.email || '',
-               gender: user?.gender || 'Not specified',
-               // Also include a nested user object with full profile information
-               user: user ? {
-                  id: user.id || user._id,
-                  username: userName,
-                  name: userName,
-                  email: user.email || '',
-                  gender: user.gender || 'Not specified'
-               } : null,
+               ...userData,
                updatedAt: new Date().toISOString(),
                isDefaultRecord: true
             };
@@ -124,14 +91,11 @@ const RecordService = {
          } catch (apiError) {
             // Handle 404 errors (endpoint not implemented)
             if (apiError.response?.status === 404 || apiError.response?.status === 401) {
-               console.log('Study records endpoint not implemented or unauthorized');
                return [];
             }
             throw apiError;
          }
       } catch (error) {
-         console.error('Error fetching all study records:', error);
-         
          if (error.response?.status === 403) {
             throw new Error('You do not have permission to view all records.');
          } else {
@@ -206,17 +170,13 @@ const RecordService = {
             // First check if logout is in progress
             const isLoggingOut = await AsyncStorage.getItem('isLoggingOut');
             if (isLoggingOut === 'true') {
-               console.log('Logout in progress, skipping study record fetch');
                throw new Error('Operation aborted due to ongoing logout');
             }
-         } else {
-            console.log('Processing final sync record fetch before logout');
          }
          
          // First check for auth token
          const token = await AsyncStorage.getItem('userToken');
          if (!token) {
-            console.log('No auth token found, skipping study record fetch');
             throw new Error('Authentication required. Please log in again.');
          }
          
@@ -234,7 +194,6 @@ const RecordService = {
       } catch (error) {
          // Return a default record object for 404s (endpoint not implemented)
          if (error.response?.status === 404) {
-            console.log('Study record endpoint not implemented yet, using defaults');
             return {
                userId: userId,
                currentLearning: 0,
@@ -243,8 +202,6 @@ const RecordService = {
                isDefaultRecord: true
             };
          }
-         
-         console.error('Error fetching study record:', error);
          
          if (error.response?.status === 401) {
             throw new Error('You need to be logged in to view this record.');
@@ -282,41 +239,29 @@ const RecordService = {
                   user = null; // Current user doesn't match requested userId
                }
             } catch (error) {
-               console.log('Could not get user details for record creation');
+               // Error handling
             }
          }
          
-         // Ensure consistent field naming for user information
-         const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'User ' + userId.substring(0, 5));
+         // Use helper to create consistent user data object
+         const userData = user ? UserDataHelper.createNestedUserObject(user) : { 
+            userId, 
+            username: `User ${userId.substring(0, 5)}`,
+            name: `User ${userId.substring(0, 5)}`
+         };
          
          // Include user information in the record data
          const recordData = {
             ...data,
-            userId,
-            username: userName,
-            name: userName, // Add both fields for compatibility
-            email: user?.email || '',
-            gender: user?.gender || 'Not specified',
-            // Also include a nested user object with full profile information
-            user: user ? {
-               id: user.id || user._id,
-               username: userName,
-               name: userName,
-               email: user.email || '',
-               gender: user.gender || 'Not specified'
-            } : null,
+            ...userData,
             updatedAt: new Date().toISOString()
          };
-         
-         
          
          const response = await apiClient.post('/study-record', recordData);
          return response.data;
       } catch (error) {
          // Handle 404 (endpoint not implemented)
          if (error.response?.status === 404) {
-            console.log('Study record creation endpoint not implemented yet');
-            
             // Try to get user details
             let user = null;
             try {
@@ -325,27 +270,19 @@ const RecordService = {
                   user = null;
                }
             } catch (userError) {
-               console.log('Could not get user details for local record');
+               // Error handling
             }
             
-            // Ensure consistent field naming for user information
-            const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'User ' + userId.substring(0, 5));
+            // Use helper to create user data
+            const userData = user ? UserDataHelper.createNestedUserObject(user) : { 
+               userId, 
+               username: `User ${userId.substring(0, 5)}`,
+               name: `User ${userId.substring(0, 5)}`
+            };
             
             const mockRecord = {
                ...data,
-               userId,
-               username: userName,
-               name: userName, // Add both fields for compatibility
-               email: user?.email || '',
-               gender: user?.gender || 'Not specified',
-               // Also include a nested user object with full profile information
-               user: user ? {
-                  id: user.id || user._id,
-                  username: userName,
-                  name: userName,
-                  email: user.email || '',
-                  gender: user.gender || 'Not specified'
-               } : null,
+               ...userData,
                updatedAt: new Date().toISOString(),
                id: `local_${Date.now()}`,
                isDefaultRecord: true
@@ -420,7 +357,6 @@ const RecordService = {
          const pending = JSON.parse(pendingStr);
          return pending.find(p => p.userId === userId || p.id === userId) || null;
       } catch (error) {
-         console.error('Error getting pending record:', error);
          return null;
       }
    },
@@ -434,7 +370,6 @@ const RecordService = {
          const pendingStr = await AsyncStorage.getItem(PENDING_RECORDS_KEY);
          return pendingStr ? JSON.parse(pendingStr) : [];
       } catch (error) {
-         console.error('Error getting all pending records:', error);
          return [];
       }
    }

@@ -50,7 +50,6 @@ const UserService = {
          } catch (apiError) {
             // If endpoint is not implemented (404), use cached data without error
             if (apiError.response?.status === 404) {
-               console.log('Profile endpoint not implemented yet, using cached data');
                const cachedData = await AuthService.getCurrentUser();
                if (cachedData) return cachedData;
                throw new Error('No user data available');
@@ -120,19 +119,14 @@ const UserService = {
          try {
             // Try to fetch from server - main users endpoint
             const response = await apiClient.get('/users');
-            console.log('Successfully fetched users from /users endpoint');
             return response.data;
          } catch (error) {
             if (error.response?.status === 404) {
-               console.log('/users endpoint not available, trying study records');
-               
                // Try to get user data from study records
                try {
                   const studyRecords = await apiClient.get('/study-records');
                   
                   if (studyRecords.data && Array.isArray(studyRecords.data)) {
-                     console.log('Using user data from study records');
-                     
                      // Extract unique users from study records
                      const users = [];
                      const userIds = new Set();
@@ -160,11 +154,10 @@ const UserService = {
                      return users;
                   }
                } catch (studyError) {
-                  console.log('Failed to get user data from study records');
+                  // Error handling, no need for log
                }
                
                // As a last resort, return just the current user
-               console.log('No user data available from backend, using only current user');
                const currentUser = await AuthService.getCurrentUser();
                
                return currentUser ? [currentUser] : [];

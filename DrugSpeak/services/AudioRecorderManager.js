@@ -22,12 +22,9 @@ const AudioRecorderManager = {
 
    loadStoredRecordings: async (storageKey) => {
       try {
-         console.log(`Loading recordings with key ${storageKey}`);
-         
          // Try local cache first for faster access
          const savedRecordings = await AsyncStorage.getItem(storageKey);
          if (savedRecordings) {
-            console.log('Found saved recordings in local cache');
             return JSON.parse(savedRecordings);
          }
          
@@ -35,14 +32,12 @@ const AudioRecorderManager = {
          try {
             const user = await AuthService.getCurrentUser();
             if (!user) {
-               console.log('No user logged in, cannot fetch recordings from backend');
                return [];
             }
             
             // Get drugId from storageKey
             const drugId = storageKey.split('_')[1];
             if (!drugId) {
-               console.log('Invalid storage key format, cannot extract drugId');
                return [];
             }
             
@@ -53,12 +48,10 @@ const AudioRecorderManager = {
             // Cache the recordings locally for faster access
             await AsyncStorage.setItem(storageKey, JSON.stringify(recordings));
             
-            console.log(`Fetched ${recordings.length} recordings from backend`);
             return recordings;
          } catch (serverError) {
             // Handle 404 errors gracefully (endpoint not implemented)
             if (serverError.response?.status === 404) {
-               console.log('Recordings endpoint not implemented yet, using local data only');
                return [];
             }
             
@@ -74,8 +67,6 @@ const AudioRecorderManager = {
 
    saveRecordings: async (storageKey, recordings) => {
       try {
-         console.log(`Saving ${recordings.length} recordings`);
-         
          // Save to local cache first for immediate access
          const jsonValue = JSON.stringify(recordings);
          await AsyncStorage.setItem(storageKey, jsonValue);
@@ -84,14 +75,12 @@ const AudioRecorderManager = {
          try {
             const user = await AuthService.getCurrentUser();
             if (!user) {
-               console.log('No user logged in, cannot save recordings to backend');
                return true;
             }
             
             // Get drugId from storageKey
             const drugId = storageKey.split('_')[1];
             if (!drugId) {
-               console.log('Invalid storage key format, cannot extract drugId');
                return true;
             }
             
@@ -130,15 +119,13 @@ const AudioRecorderManager = {
                   await RecordService.upsertStudyRecord(updatedRecord);
                }
             } catch (studyRecordError) {
-               console.log('Could not update study record with user profile:', studyRecordError);
+               console.error('Could not update study record with user profile:', studyRecordError);
             }
             
-            console.log('Recordings saved successfully to backend');
             return true;
          } catch (serverError) {
             // Handle 404 errors gracefully (endpoint not implemented)
             if (serverError.response?.status === 404) {
-               console.log('Recordings save endpoint not implemented yet, keeping data local');
                return true;
             }
             
@@ -154,8 +141,6 @@ const AudioRecorderManager = {
 
    uploadAudioFile: async (uri, drugId, recordingId) => {
       try {
-         console.log('Uploading audio file to server:', uri);
-         
          // Check if the file exists
          const fileInfo = await FileSystem.getInfoAsync(uri);
          if (!fileInfo.exists) {
@@ -179,12 +164,10 @@ const AudioRecorderManager = {
             },
          });
          
-         console.log('Audio file uploaded successfully');
          return response.data.fileUrl; // Return the URL of the uploaded file
       } catch (error) {
          // Handle 404 error (endpoint not implemented)
          if (error.response?.status === 404) {
-            console.log('Audio upload endpoint not implemented yet, keeping file local');
             return uri;
          }
          
@@ -196,21 +179,17 @@ const AudioRecorderManager = {
 
    downloadAudioFile: async (fileUrl, localFilename) => {
       try {
-         console.log('Downloading audio file:', fileUrl);
-         
          // Define where to save the file
          const fileUri = `${FileSystem.documentDirectory}${localFilename}`;
          
          // Check if we already have this file cached
          const fileInfo = await FileSystem.getInfoAsync(fileUri);
          if (fileInfo.exists) {
-            console.log('File already exists locally');
             return fileUri;
          }
          
          // Download the file
          const downloadResult = await FileSystem.downloadAsync(fileUrl, fileUri);
-         console.log('File downloaded to:', downloadResult.uri);
          return downloadResult.uri;
       } catch (error) {
          console.error('Error downloading audio file:', error);
@@ -220,11 +199,9 @@ const AudioRecorderManager = {
 
    startNewRecording: async () => {
       try {
-         console.log('Starting recording...');
          const { recording } = await Audio.Recording.createAsync(
             Audio.RecordingOptionsPresets.HIGH_QUALITY
          );
-         console.log('Recording started');
          return recording;
       } catch (error) {
          console.error('Failed to start recording', error);
@@ -235,99 +212,87 @@ const AudioRecorderManager = {
    stopRecording: async (recording) => {
       try {
          if (!recording) {
-            console.log('No recording to stop');
             return null;
          }
          
-         console.log('Stopping recording...');
          await recording.stopAndUnloadAsync();
          const uri = recording.getURI();
-         console.log('Recording saved at:', uri);
          
          // Update study record with user information to fix Community screen issues
          try {
             const user = await AuthService.getCurrentUser();
             if (user) {
-               // Prepare username with consistent field naming
-               const userName = user.name || user.username || (user.email ? user.email.split('@')[0] : 'Anonymous');
-               
-               // Ensure the study record has complete user profile data
+               // Try to update the study record with user profile data
                const studyRecord = await RecordService.getStudyRecordById(user.id || user._id);
                
-               // If study record exists but doesn't have proper user data, update it
-               if (studyRecord && (!studyRecord.username || !studyRecord.gender || !studyRecord.user)) {
-
+               if (studyRecord) {
+                  // Prepare username with consistent field naming
+                  const userName = user.name || user.username || (user.email ? user.email.split('@')[0] : 'Anonymous');
                   
-                  const updatedRecord = {
-                     ...studyRecord,
-                     username: userName,
-                     name: userName, // Add both fields for compatibility
-                     email: user.email || '',
-                     gender: user.gender || 'Not specified',
-                     // Also include a nested user object with full profile information
-                     user: {
-                        id: user.id || user._id,
+                  // Only update if missing fields
+                  if (!studyRecord.gender || !studyRecord.username || !studyRecord.user) {
+                     const updatedRecord = {
+                        ...studyRecord,
                         username: userName,
                         name: userName,
                         email: user.email || '',
-                        gender: user.gender || 'Not specified'
-                     }
-                  };
-                  
-                  await RecordService.upsertStudyRecord(updatedRecord);
+                        gender: user.gender || 'Not specified',
+                        // Also include a nested user object with full profile information
+                        user: {
+                           id: user.id || user._id, 
+                           username: userName,
+                           name: userName,
+                           email: user.email || '',
+                           gender: user.gender || 'Not specified'
+                        }
+                     };
+                     
+                     await RecordService.upsertStudyRecord(updatedRecord);
+                  }
                }
             }
          } catch (error) {
-            console.log('Could not update study record with user profile after recording:', error);
+            console.error('Could not update study record with user profile after recording:', error);
          }
          
          return uri;
       } catch (error) {
          console.error('Failed to stop recording', error);
-         throw error;
+         return null;
       }
    },
 
    playSound: async (uri) => {
       try {
-         console.log('Playing sound from URI:', uri);
-         const { sound } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: true }
-         );
-         return sound;
+         const soundObject = new Audio.Sound();
+         await soundObject.loadAsync({ uri });
+         await soundObject.playAsync();
+         return soundObject;
       } catch (error) {
          console.error('Failed to play sound', error);
-         throw error;
+         return null;
       }
    },
 
    stopSound: async (sound) => {
-      if (!sound) {
-         console.log('No sound to stop');
-         return;
-      }
-      
       try {
-         console.log('Stopping sound');
+         if (!sound) {
+            return;
+         }
+         
          await sound.stopAsync();
          await sound.unloadAsync();
-         console.log('Sound stopped and unloaded');
       } catch (error) {
          console.error('Failed to stop sound', error);
-         throw error;
       }
    },
-   
-   deleteRecording: async (storageKey, recordingId) => {
+
+   deleteRecording: async (recordingId, storageKey) => {
       try {
-         console.log(`Deleting recording ${recordingId}`);
-         
-         // Get current recordings
+         // Load existing recordings
          const savedRecordingsStr = await AsyncStorage.getItem(storageKey);
          if (!savedRecordingsStr) {
-            console.log('No recordings found to delete from');
-            return true;
+            return false;
          }
          
          const savedRecordings = JSON.parse(savedRecordingsStr);
@@ -335,53 +300,49 @@ const AudioRecorderManager = {
          // Find the recording to delete
          const recordingToDelete = savedRecordings.find(r => r.id === recordingId);
          if (!recordingToDelete) {
-            console.log('Recording not found in saved recordings');
-            return true;
+            return false;
          }
          
-         // Delete the actual audio file if it's local
-         if (recordingToDelete.uri && recordingToDelete.uri.startsWith('file://')) {
-            try {
-               const fileInfo = await FileSystem.getInfoAsync(recordingToDelete.uri);
-               if (fileInfo.exists) {
-                  await FileSystem.deleteAsync(recordingToDelete.uri);
-                  console.log('Deleted audio file:', recordingToDelete.uri);
-               }
-            } catch (fileError) {
-               console.error('Error deleting audio file:', fileError);
+         // Delete the actual audio file
+         try {
+            const fileExists = await FileSystem.getInfoAsync(recordingToDelete.uri);
+            if (fileExists.exists) {
+               await FileSystem.deleteAsync(recordingToDelete.uri);
             }
+         } catch (fileError) {
+            console.error('Error deleting audio file:', fileError);
          }
          
-         // Filter out the deleted recording
+         // Remove from array of recordings
          const updatedRecordings = savedRecordings.filter(r => r.id !== recordingId);
          
-         // Save updated recordings list to local storage
+         // Save updated recordings list
          await AsyncStorage.setItem(storageKey, JSON.stringify(updatedRecordings));
          
-         // Try to delete from backend
+         // Try to delete from backend as well
          try {
-            const user = await AuthService.getCurrentUser();
-            if (!user) return true;
-            
+            // Extract drug ID from storage key
             const drugId = storageKey.split('_')[1];
-            if (!drugId) return true;
-            
-            // Send delete request to server
-            await apiClient.delete(`/recordings/${drugId}/${recordingId}`);
-            console.log('Recording deleted from backend');
-         } catch (serverError) {
-            // Don't log 404 errors (endpoint not implemented) as errors
-            if (serverError.response?.status !== 404) {
-               console.error('Error deleting recording from server:', serverError);
-            } else {
-               console.log('Recording delete endpoint not implemented yet');
+            if (drugId) {
+               // Delete from backend
+               try {
+                  await apiClient.delete(`/recordings/${drugId}/${recordingId}`);
+               } catch (apiError) {
+                  // Handle 404 (endpoint not implemented)
+                  if (apiError.response?.status !== 404) {
+                     console.error('Error deleting recording from backend:', apiError);
+                  }
+               }
             }
+         } catch (error) {
+            // If backend delete fails, we still deleted locally
+            console.error('Error during backend delete attempt:', error);
          }
          
          return true;
       } catch (error) {
          console.error('Error deleting recording:', error);
-         throw error;
+         return false;
       }
    }
 };

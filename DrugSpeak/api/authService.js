@@ -15,8 +15,6 @@ const AuthService = {
     */
    login: async (email, password) => {
       try {
-         console.log(`Attempting to login with email: ${email}`);
-         
          // First, ensure we're not in the middle of a logout
          await AsyncStorage.removeItem('isLoggingOut');
          await AsyncStorage.removeItem('finalSync');
@@ -29,8 +27,6 @@ const AuthService = {
          const response = await apiClient.post('/auth/login', { email, password });
          const { user, token } = response.data;
          
-         console.log(`Login successful for user: ${user.id || user._id}`);
-         
          // Store credentials first
          await AsyncStorage.setItem('userToken', token);
          await AsyncStorage.setItem('userData', JSON.stringify(user));
@@ -42,37 +38,28 @@ const AuthService = {
          try {
             // First check for data in our direct storage format
             const hasDirectData = await LearningDataService.hasLearningList(userId);
-            if (hasDirectData) {
-               console.log(`Found learning data for user ${userId} in direct storage`);
-               // The data will be loaded when needed by screens
-            } else {
+            if (!hasDirectData) {
                // Fall back to using backed up data if direct storage is empty
-               console.log(`Checking backup data for user ${userId}`);
                const backupKey = `${BACKUP_LEARNING_DATA}_${userId}`;
                const backupData = await AsyncStorage.getItem(backupKey);
                
                if (backupData) {
-                  console.log(`Found backed up learning data for user ${userId}, restoring...`);
                   // Store it with the proper user-prefixed key that Redux-Persist will use
                   const persistKey = `user_${userId}_persist:root`;
                   await AsyncStorage.setItem(persistKey, backupData);
-                  console.log('Backed up learning data restored successfully');
                }
             }
          } catch (restoreError) {
-            console.error('Error restoring learning data:', restoreError);
+            // Error handling for restore
          }
          
          // Then configure store for this user - this will LOAD existing data for this user
          await setCurrentUser(user.id || user._id);
          
-         console.log('Login successful, token and user data stored');
-         
          // Return the result immediately to complete the login flow
          // Data loading will happen afterwards in the background
          return { user, token };
       } catch (error) {
-         console.error('Login error:', error);
          if (error.response?.status === 401) {
             throw new Error('Invalid email or password');
          } else {
@@ -139,19 +126,15 @@ const AuthService = {
     */
    logout: async () => {
       try {
-         console.log('Starting logout process');
-         
          // Cancel pending operations by setting a flag in AsyncStorage
          await AsyncStorage.setItem('isLoggingOut', 'true');
          
          // Give pending operations a moment to detect the logout flag and abort
-         console.log('Allowing time for pending operations to complete...');
          await new Promise(resolve => setTimeout(resolve, 3000));
          
          // IMPORTANT: Get current user before clearing auth data
          const userData = await AuthService.getCurrentUser();
          const userId = userData?.id || userData?._id;
-         console.log('Logging out user:', userId || 'unknown');
          
          // SAVE LEARNING DATA: Get current Redux state and save it
          try {
@@ -161,11 +144,8 @@ const AuthService = {
                const state = store.getState();
                
                if (state.learningList?.learningList?.length > 0) {
-                  console.log(`Saving learning data for user ${userId} before logout`);
-                  
                   // Save using LearningDataService
                   await LearningDataService.saveLearningList(userId, state.learningList.learningList);
-                  console.log(`Saved ${state.learningList.learningList.length} learning items for user ${userId}`);
                   
                   // Also back up data for Redux-Persist format as a fallback
                   const backupKey = `${BACKUP_LEARNING_DATA}_${userId}`;
@@ -173,32 +153,26 @@ const AuthService = {
                   const persistData = await AsyncStorage.getItem(persistKey);
                   if (persistData) {
                      await AsyncStorage.setItem(backupKey, persistData);
-                     console.log('Learning data backed up for future sessions');
                   }
                }
             }
          } catch (saveError) {
-            console.error('Error saving learning data before logout:', saveError);
+            // Error handling for save
          }
          
          // Clear only authentication data, not user data
          await AsyncStorage.removeItem('userToken');
          await AsyncStorage.removeItem('userData');
-         console.log('Authentication tokens removed');
          
          // Clear Redux store data - this will reset UI state but won't affect AsyncStorage data
          await clearUserData();
-         console.log('Redux store data cleared');
          
          // Clean up the flags
          await AsyncStorage.removeItem('isLoggingOut');
          await AsyncStorage.removeItem('finalSync');
          
-         console.log('Logout process completed');
-         
          return true;
       } catch (error) {
-         console.error('Logout error:', error);
          // Try again in case of error
          try {
             await clearUserData();
@@ -207,7 +181,7 @@ const AuthService = {
             await AsyncStorage.removeItem('isLoggingOut');
             await AsyncStorage.removeItem('finalSync');
          } catch (secondError) {
-            console.error('Failed to clear storage:', secondError);
+            // Handle second error
          }
          return false;
       }
@@ -222,26 +196,22 @@ const AuthService = {
          // Check for token first
          const token = await AsyncStorage.getItem('userToken');
          if (!token) {
-            console.log('getCurrentUser: No auth token found');
             return null;
          }
 
          // Then get user data
          const userData = await AsyncStorage.getItem('userData');
          if (!userData) {
-            console.log('getCurrentUser: No user data found in storage');
             return null;
          }
          
          try {
             return JSON.parse(userData);
          } catch (parseError) {
-            console.error('Error parsing user data:', parseError);
             await AsyncStorage.removeItem('userData'); // Clear corrupted data
             return null;
          }
       } catch (error) {
-         console.error('Error fetching user data from storage:', error);
          return null;
       }
    },
@@ -255,7 +225,6 @@ const AuthService = {
       try {
          await AsyncStorage.setItem('userData', JSON.stringify(userData));
       } catch (error) {
-         console.error('Error updating user data in storage:', error);
          throw new Error('Failed to update user data in storage');
       }
    },
@@ -282,7 +251,6 @@ const AuthService = {
          } catch (apiError) {
             // Check if this is a 404 error (endpoint not implemented yet)
             if (apiError.response?.status === 404) {
-               console.log('Profile endpoint not implemented yet, using cached data');
                // Return cached data as fallback without logging as error
                return AuthService.getCurrentUser();
             }
