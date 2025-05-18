@@ -117,26 +117,17 @@ const RecordService = {
     */
    getAllStudyRecords: async () => {
       try {
-         // First check for auth token - but don't require it
-         const token = await AsyncStorage.getItem('userToken');
-         
-         // If user is logged in, try to get from API
-         if (token) {
-            try {
-               const response = await apiClient.get('/study-record');
-               return response.data;
-            } catch (apiError) {
-               // Handle 404 errors (endpoint not implemented)
-               if (apiError.response?.status === 404) {
-                  console.log('Study records endpoint not implemented yet, using defaults');
-                  return [];
-               }
-               throw apiError;
+         // Try to get study records regardless of login status
+         try {
+            const response = await apiClient.get('/study-record');
+            return response.data;
+         } catch (apiError) {
+            // Handle 404 errors (endpoint not implemented)
+            if (apiError.response?.status === 404 || apiError.response?.status === 401) {
+               console.log('Study records endpoint not implemented or unauthorized');
+               return [];
             }
-         } else {
-            // Not logged in, but still return empty array rather than blocking
-            console.log('No auth token found, returning empty study records array');
-            return [];
+            throw apiError;
          }
       } catch (error) {
          console.error('Error fetching all study records:', error);
@@ -147,6 +138,57 @@ const RecordService = {
             throw new Error('Failed to fetch study records. Please try again.');
          }
       }
+   },
+
+   /**
+    * Get mock study records for community display when API unavailable
+    * @private
+    * @returns {Array} Mock study records
+    */
+   getMockStudyRecords: () => {
+      // Create some mock study records for display
+      return [
+         {
+            userId: "user1",
+            username: "JaneDoe",
+            gender: "Female",
+            totalScore: 350,
+            currentLearning: 3,
+            finishedLearning: 12
+         },
+         {
+            userId: "user2",
+            username: "JohnSmith",
+            gender: "Male", 
+            totalScore: 420,
+            currentLearning: 5,
+            finishedLearning: 15
+         },
+         {
+            userId: "user3",
+            username: "AlexWong",
+            gender: "Male",
+            totalScore: 280,
+            currentLearning: 6,
+            finishedLearning: 7
+         },
+         {
+            userId: "user4",
+            username: "SarahBrown",
+            gender: "Female",
+            totalScore: 380,
+            currentLearning: 4,
+            finishedLearning: 11
+         },
+         {
+            userId: "user5",
+            username: "MichaelLee",
+            gender: "Male",
+            totalScore: 310,
+            currentLearning: 2,
+            finishedLearning: 10
+         }
+      ];
    },
 
    /**

@@ -23,9 +23,7 @@ import AuthService from './api/authService';
 import UserService from './api/userService';
 import LearningDataService from './api/learningDataService';
 import * as SplashScreen from 'expo-splash-screen';
-import EmptyState from './components/EmptyState';
-import AudioRecorderManager from './services/AudioRecorderManager';
-import RecordService from './api/recordService';
+import EmptyState from './components/EmptyState';import RecordService from './api/recordService';
 import { setLearningList } from './store/learningListSlice';
 
 SplashScreen.preventAutoHideAsync();
@@ -113,18 +111,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
   };
   
   const handleCommunityPress = () => {
-    if (!isLoggedIn) {
-      Alert.alert(
-        "Login Required",
-        "You need to be logged in to access the Community rankings.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Sign In", onPress: () => setActiveTab('profile') }
-        ]
-      );
-    } else {
-      setActiveTab('community');
-    }
+    setActiveTab('community');
   };
   
   return (
@@ -222,12 +209,18 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
         }}
         onPress={() => setActiveTab('profile')}
       >
-        <Icon name="person" size={24} color={activeTab === 'profile' ? Colors.primary : Colors.textSecondary} />
+        <Icon 
+          name={isLoggedIn ? "person" : "login"} 
+          size={24} 
+          color={activeTab === 'profile' ? Colors.primary : Colors.textSecondary} 
+        />
         <Text style={{
           fontSize: Typography.sizes.small,
           color: activeTab === 'profile' ? Colors.primary : Colors.textSecondary,
           marginTop: Spacing.xs,
-        }}>Profile</Text>
+        }}>
+          {isLoggedIn ? "Profile" : "Sign In"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -293,9 +286,10 @@ const LoadingView = ({ message = "Loading..." }) => (
 );
 
 const MainApp = () => {
-  const [activeTab, setActiveTab] = useState('drugs');
+  const [activeTab, setActiveTab] = useState('profile');
   const [isLoggedIn, setIsLoggedInState] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const appState = useRef(AppState.currentState);
   const navigationRef = useRef();
   const authStateKey = useRef(0);
@@ -329,6 +323,9 @@ const MainApp = () => {
           try {
             await AuthService.refreshUserData();
             await loadLearningData();
+            if (!initialCheckDone) {
+              setActiveTab('drugs');
+            }
           } catch (refreshError) {
             // Not critical, continue
           }
@@ -337,6 +334,7 @@ const MainApp = () => {
         setIsLoggedInState(false);
       } finally {
         setLoading(false);
+        setInitialCheckDone(true);
       }
     };
     
@@ -356,13 +354,13 @@ const MainApp = () => {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [initialCheckDone]);
 
   const setIsLoggedIn = async (status) => {
     if (status === false && isLoggedIn === true) {
       setIsLoggedInState(false);
       authStateKey.current += 1;
-      setActiveTab('drugs');
+      setActiveTab('profile');
     } else if (status === true && isLoggedIn === false) {
       setIsLoggedInState(true);
       authStateKey.current += 1;
@@ -438,20 +436,15 @@ const MainApp = () => {
         }
       
       case 'community':
-        if (isLoggedIn) {
-          return (
-            <Stack.Navigator screenOptions={headerOptions}>
-              <Stack.Screen 
-                name="Community" 
-                component={CommunityScreen} 
-                options={{ title: 'Community' }} 
-              />
-            </Stack.Navigator>
-          );
-        } else {
-          setActiveTab('profile');
-          return null;
-        }
+        return (
+          <Stack.Navigator screenOptions={headerOptions}>
+            <Stack.Screen 
+              name="Community" 
+              component={CommunityScreen} 
+              options={{ title: 'Community' }} 
+            />
+          </Stack.Navigator>
+        );
       
       case 'profile':
         return <ProfileNavigator isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} authStateKey={authStateKey.current} />;

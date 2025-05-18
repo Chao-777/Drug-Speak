@@ -279,7 +279,7 @@ const CommunityScreen = ({ navigation }) => {
       {!currentUser && rankings.length > 0 && (
         <TouchableOpacity 
           style={styles.loginContainer}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.navigate('SignIn')}
         >
           <Text style={styles.loginText}>
             Log in to see your ranking

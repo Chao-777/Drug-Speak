@@ -397,7 +397,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
          
          <View style={styles.buttonContainer}>
             <PrimaryButton 
-               title="Update Profile"
+               title="Update"
                icon="edit"
                onPress={handleUpdate}
                style={styles.actionButton}
