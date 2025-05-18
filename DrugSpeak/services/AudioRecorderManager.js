@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import apiClient from '../api/apiClient';
 import AuthService from '../api/authService';
+import RecordService from '../api/recordService';
 
 const AudioRecorderManager = {
    requestPermissions: async () => {
@@ -96,6 +97,41 @@ const AudioRecorderManager = {
             
             // Save recordings to backend
             await apiClient.post(`/recordings/${drugId}`, { recordings });
+            
+            // Also ensure user study record is updated with current user profile
+            // This fixes the issue where user gender and name might not be included
+            try {
+               // Get current study record
+               const studyRecord = await RecordService.getStudyRecordById(user.id || user._id);
+               
+               // Prepare username with consistent field naming
+               const userName = user.name || user.username || (user.email ? user.email.split('@')[0] : 'Anonymous');
+               
+               // Only update if study record exists and doesn't have proper user data
+               if (studyRecord && (!studyRecord.username || !studyRecord.gender || !studyRecord.user)) {
+
+                  
+                  const updatedRecord = {
+                     ...studyRecord,
+                     username: userName,
+                     name: userName, // Add both fields for compatibility
+                     email: user.email || '',
+                     gender: user.gender || 'Not specified',
+                     // Also include a nested user object with full profile information
+                     user: {
+                        id: user.id || user._id,
+                        username: userName,
+                        name: userName,
+                        email: user.email || '',
+                        gender: user.gender || 'Not specified'
+                     }
+                  };
+                  
+                  await RecordService.upsertStudyRecord(updatedRecord);
+               }
+            } catch (studyRecordError) {
+               console.log('Could not update study record with user profile:', studyRecordError);
+            }
             
             console.log('Recordings saved successfully to backend');
             return true;
@@ -207,6 +243,44 @@ const AudioRecorderManager = {
          await recording.stopAndUnloadAsync();
          const uri = recording.getURI();
          console.log('Recording saved at:', uri);
+         
+         // Update study record with user information to fix Community screen issues
+         try {
+            const user = await AuthService.getCurrentUser();
+            if (user) {
+               // Prepare username with consistent field naming
+               const userName = user.name || user.username || (user.email ? user.email.split('@')[0] : 'Anonymous');
+               
+               // Ensure the study record has complete user profile data
+               const studyRecord = await RecordService.getStudyRecordById(user.id || user._id);
+               
+               // If study record exists but doesn't have proper user data, update it
+               if (studyRecord && (!studyRecord.username || !studyRecord.gender || !studyRecord.user)) {
+
+                  
+                  const updatedRecord = {
+                     ...studyRecord,
+                     username: userName,
+                     name: userName, // Add both fields for compatibility
+                     email: user.email || '',
+                     gender: user.gender || 'Not specified',
+                     // Also include a nested user object with full profile information
+                     user: {
+                        id: user.id || user._id,
+                        username: userName,
+                        name: userName,
+                        email: user.email || '',
+                        gender: user.gender || 'Not specified'
+                     }
+                  };
+                  
+                  await RecordService.upsertStudyRecord(updatedRecord);
+               }
+            }
+         } catch (error) {
+            console.log('Could not update study record with user profile after recording:', error);
+         }
+         
          return uri;
       } catch (error) {
          console.error('Failed to stop recording', error);

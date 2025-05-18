@@ -4,19 +4,17 @@ import { Colors, Spacing, Borders, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
 import RecordService from '../api/recordService';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
+import Header from '../components/Header';
 import { PrimaryButton, SecondaryButton } from '../components/Button';
 import ErrorState from '../components/ErrorState';
 import FormInput from '../components/FormInput';
 import { SectionHeader } from '../components/SectionHeader';
 import ContentSection from '../components/ContentSection';
 import StatsBar from '../components/StatsBar';
-import Header from '../components/Header';
 import LabeledText from '../components/LabeledText';
 import FormModal from '../components/FormModal';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateLearningStatus } from '../store/learningListSlice';
 
 const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
@@ -366,11 +364,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             />
          }
       >
-         <View style={styles.profileHeader}>
-            <Icon name="account-circle" size={80} color={Colors.primary} />
-            <Text style={styles.welcomeText}>Welcome, {user?.username || 'User'}!</Text>
-            <Text style={styles.joinedText}>Member since {formatDate(user?.createdAt)}</Text>
-         </View>
+         <Header title="User Profile" /   >
          
          <ContentSection style={styles.infoSection}>
             <LabeledText 

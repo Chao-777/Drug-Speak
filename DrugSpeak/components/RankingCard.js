@@ -7,7 +7,8 @@ const RankingCard = ({
   rank, 
   user, 
   score, 
-  isCurrentUser 
+  isCurrentUser,
+  progress = 0 // Default to 0 if not provided
 }) => (
   <View style={[
     styles.container, 
@@ -40,6 +41,12 @@ const RankingCard = ({
         {user.name || user.email?.split('@')[0] || 'Anonymous'}
         {isCurrentUser && ' (You)'}
       </Text>
+      
+      <View style={styles.userDetails}>
+        <Text style={styles.detailText}>
+          {user.gender || 'Not specified'} • {progress}% completed
+        </Text>
+      </View>
     </View>
     
     <View style={styles.scoreContainer}>
@@ -89,6 +96,13 @@ const styles = StyleSheet.create({
   },
   currentUserText: {
     color: Colors.primary,
+  },
+  userDetails: {
+    marginTop: 2,
+  },
+  detailText: {
+    fontSize: Typography.sizes.small,
+    color: Colors.textSecondary,
   },
   scoreContainer: {
     alignItems: 'center',

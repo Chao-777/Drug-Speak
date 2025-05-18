@@ -118,61 +118,71 @@ const UserService = {
    getUsers: async () => {
       try {
          try {
-            // Try to fetch from server
-            const response = await apiClient.get('/users/rankings');
+            // Try to fetch from server - main users endpoint
+            const response = await apiClient.get('/users');
+            console.log('Successfully fetched users from /users endpoint');
             return response.data;
          } catch (error) {
-            // If the API is not implemented yet (404), create mock data
             if (error.response?.status === 404) {
-               // Get current user for comparison
-               const currentUser = await AuthService.getCurrentUser();
+               console.log('/users endpoint not available, trying study records');
                
-               // Create mock user data
-               let mockUsers = [
-                  { id: '1', name: 'Emma Johnson', email: 'emma@example.com', score: 950 },
-                  { id: '2', name: 'Noah Smith', email: 'noah@example.com', score: 920 },
-                  { id: '3', name: 'Olivia Williams', email: 'olivia@example.com', score: 890 },
-                  { id: '4', name: 'Liam Brown', email: 'liam@example.com', score: 850 },
-                  { id: '5', name: 'Ava Jones', email: 'ava@example.com', score: 820 },
-                  { id: '6', name: 'Ethan Miller', email: 'ethan@example.com', score: 780 },
-                  { id: '7', name: 'Sophia Davis', email: 'sophia@example.com', score: 750 },
-                  { id: '8', name: 'Mason Wilson', email: 'mason@example.com', score: 700 },
-                  { id: '9', name: 'Isabella Taylor', email: 'isabella@example.com', score: 650 },
-                  { id: '10', name: 'Logan Martinez', email: 'logan@example.com', score: 600 },
-               ];
-               
-               // Add current user to the mock data if available
-               if (currentUser) {
-                  // Check if user already exists in the list
-                  const userExists = mockUsers.some(u => 
-                     u.id === currentUser.id || 
-                     u._id === currentUser._id || 
-                     u.email === currentUser.email
-                  );
+               // Try to get user data from study records
+               try {
+                  const studyRecords = await apiClient.get('/study-records');
                   
-                  // If not, add them with a random score
-                  if (!userExists) {
-                     const userScore = Math.floor(Math.random() * 500) + 500;
-                     mockUsers.push({
-                        id: currentUser.id || currentUser._id,
-                        name: currentUser.name,
-                        email: currentUser.email,
-                        score: userScore
-                     });
+                  if (studyRecords.data && Array.isArray(studyRecords.data)) {
+                     console.log('Using user data from study records');
+                     
+                     // Extract unique users from study records
+                     const users = [];
+                     const userIds = new Set();
+                     
+                     for (const record of studyRecords.data) {
+                        if (record.userId && !userIds.has(record.userId)) {
+                           userIds.add(record.userId);
+                           
+                           // Try to get user details from record or defaults
+                           users.push({
+                              id: record.userId,
+                              name: record.username || `User ${record.userId.substring(0, 5)}`,
+                              email: record.email || `${record.userId}@example.com`,
+                              gender: record.gender || 'Not specified'
+                           });
+                        }
+                     }
+                     
+                     // Make sure current user is included
+                     const currentUser = await AuthService.getCurrentUser();
+                     if (currentUser && !userIds.has(currentUser.id || currentUser._id)) {
+                        users.push(currentUser);
+                     }
+                     
+                     return users;
                   }
+               } catch (studyError) {
+                  console.log('Failed to get user data from study records');
                }
                
-               // Sort by score
-               mockUsers.sort((a, b) => b.score - a.score);
+               // As a last resort, return just the current user
+               console.log('No user data available from backend, using only current user');
+               const currentUser = await AuthService.getCurrentUser();
                
-               return mockUsers;
+               return currentUser ? [currentUser] : [];
             }
             
             throw error;
          }
       } catch (error) {
          console.error('Error fetching users:', error);
-         return [];
+         
+         // Fall back to current user only - NO MOCK DATA
+         try {
+            const currentUser = await AuthService.getCurrentUser();
+            return currentUser ? [currentUser] : [];
+         } catch (authError) {
+            console.error('Could not get current user:', authError);
+            return [];
+         }
       }
    }
 };

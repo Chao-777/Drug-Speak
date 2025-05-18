@@ -42,15 +42,36 @@ const RecordService = {
             throw new Error('You need to be logged in to update your study record.');
          }
          
-         // Add user ID to the data
+         // Ensure consistent field naming for user information
+         // This makes sure both username and name fields are populated
+         const userName = user.username || user.name || user.email?.split('@')[0] || 'Anonymous';
+         
+         // Add user ID and user information to the data
          const recordData = {
             ...updateData,
-            userId: user.id || user._id
-         };
-         
-         const response = await apiClient.post('/study-record', recordData);
-         return response.data;
-      } catch (error) {
+            userId: user.id || user._id,
+            // Ensure we always include user profile data with consistent field names
+            username: userName,
+            name: userName, // Add both fields for compatibility
+            email: user.email || '',
+            gender: user.gender || 'Not specified',
+            // Also include a nested user object with full profile information
+            user: {
+               id: user.id || user._id,
+               username: userName,
+               name: userName,
+               email: user.email || '',
+               gender: user.gender || 'Not specified'
+            },
+            // Add any other relevant user fields
+            updatedAt: new Date().toISOString()
+          };
+          
+
+          
+          const response = await apiClient.post('/study-record', recordData);
+          return response.data;
+        } catch (error) {
          console.error('Error updating study record:', error);
          
          // Handle different error types
@@ -61,8 +82,27 @@ const RecordService = {
          } else if (error.response?.status === 404) {
             // Create a default record if endpoint doesn't exist
             console.log('Study record endpoint not implemented yet, using defaults');
+            
+            // When using defaults, still include the user information
+            const user = await AuthService.getCurrentUser();
+            const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'Anonymous');
+            
             return {
                ...updateData,
+               userId: user?.id || user?._id,
+               username: userName,
+               name: userName, // Add both fields for compatibility
+               email: user?.email || '',
+               gender: user?.gender || 'Not specified',
+               // Also include a nested user object with full profile information
+               user: user ? {
+                  id: user.id || user._id,
+                  username: userName,
+                  name: userName,
+                  email: user.email || '',
+                  gender: user.gender || 'Not specified'
+               } : null,
+               updatedAt: new Date().toISOString(),
                isDefaultRecord: true
             };
          } else {
@@ -77,15 +117,28 @@ const RecordService = {
     */
    getAllStudyRecords: async () => {
       try {
-         const response = await apiClient.get('/study-record');
-         return response.data;
-      } catch (error) {
-         // Check for 404 errors (endpoint not implemented)
-         if (error.response?.status === 404) {
-            console.log('Study records endpoint not implemented yet, using defaults');
+         // First check for auth token - but don't require it
+         const token = await AsyncStorage.getItem('userToken');
+         
+         // If user is logged in, try to get from API
+         if (token) {
+            try {
+               const response = await apiClient.get('/study-record');
+               return response.data;
+            } catch (apiError) {
+               // Handle 404 errors (endpoint not implemented)
+               if (apiError.response?.status === 404) {
+                  console.log('Study records endpoint not implemented yet, using defaults');
+                  return [];
+               }
+               throw apiError;
+            }
+         } else {
+            // Not logged in, but still return empty array rather than blocking
+            console.log('No auth token found, returning empty study records array');
             return [];
          }
-         
+      } catch (error) {
          console.error('Error fetching all study records:', error);
          
          if (error.response?.status === 403) {
@@ -168,18 +221,52 @@ const RecordService = {
    createStudyRecord: async (userId, data) => {
       try {
          // If userId is not provided, get from current user
+         let user = null;
          if (!userId) {
-            const user = await AuthService.getCurrentUser();
+            user = await AuthService.getCurrentUser();
             if (!user) {
                throw new Error('You need to be logged in to create a study record.');
             }
             userId = user.id || user._id;
          }
          
+         // If we don't have user object yet, try to get it
+         if (!user && userId) {
+            try {
+               // Try to get user details from user service or AuthService
+               user = await AuthService.getCurrentUser();
+               // Check if the current user matches the requested userId
+               if (user && (user.id !== userId && user._id !== userId)) {
+                  user = null; // Current user doesn't match requested userId
+               }
+            } catch (error) {
+               console.log('Could not get user details for record creation');
+            }
+         }
+         
+         // Ensure consistent field naming for user information
+         const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'User ' + userId.substring(0, 5));
+         
+         // Include user information in the record data
          const recordData = {
             ...data,
-            userId
+            userId,
+            username: userName,
+            name: userName, // Add both fields for compatibility
+            email: user?.email || '',
+            gender: user?.gender || 'Not specified',
+            // Also include a nested user object with full profile information
+            user: user ? {
+               id: user.id || user._id,
+               username: userName,
+               name: userName,
+               email: user.email || '',
+               gender: user.gender || 'Not specified'
+            } : null,
+            updatedAt: new Date().toISOString()
          };
+         
+         
          
          const response = await apiClient.post('/study-record', recordData);
          return response.data;
@@ -187,9 +274,37 @@ const RecordService = {
          // Handle 404 (endpoint not implemented)
          if (error.response?.status === 404) {
             console.log('Study record creation endpoint not implemented yet');
+            
+            // Try to get user details
+            let user = null;
+            try {
+               user = await AuthService.getCurrentUser();
+               if (user && (user.id !== userId && user._id !== userId)) {
+                  user = null;
+               }
+            } catch (userError) {
+               console.log('Could not get user details for local record');
+            }
+            
+            // Ensure consistent field naming for user information
+            const userName = user?.username || user?.name || (user?.email ? user.email.split('@')[0] : 'User ' + userId.substring(0, 5));
+            
             const mockRecord = {
                ...data,
                userId,
+               username: userName,
+               name: userName, // Add both fields for compatibility
+               email: user?.email || '',
+               gender: user?.gender || 'Not specified',
+               // Also include a nested user object with full profile information
+               user: user ? {
+                  id: user.id || user._id,
+                  username: userName,
+                  name: userName,
+                  email: user.email || '',
+                  gender: user.gender || 'Not specified'
+               } : null,
+               updatedAt: new Date().toISOString(),
                id: `local_${Date.now()}`,
                isDefaultRecord: true
             };
