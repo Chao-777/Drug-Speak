@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, SafeAreaView, View, Text } from 'react-native';
+import { ScrollView, SafeAreaView, View, Text, ActivityIndicator } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { getDrugById, categoryArray } from '../data/drugs';
 import PronunciationCard from '../components/PronunciationCard';
@@ -10,7 +10,6 @@ import ContentSection from '../components/ContentSection';
 import LabeledText from '../components/LabeledText';
 import Badge from '../components/Badge';
 import {SectionHeader} from '../components/SectionHeader';
-import LoadingIndicator from '../components/LoadingIndicator';
 
 const DrugDetailScreen = ({ route, navigation }) => {
    const { drugId } = route.params;
@@ -56,7 +55,16 @@ const DrugDetailScreen = ({ route, navigation }) => {
    };
 
    if (!drug) {
-      return <LoadingIndicator />;
+      return (
+         <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: Colors.background,
+         }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+         </View>
+      );
    }
 
    return (

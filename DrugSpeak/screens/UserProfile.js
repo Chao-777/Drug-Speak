@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text, ActivityIndicator } from 'react-native';
 import { Colors, Spacing, Borders, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
 import RecordService from '../api/recordService';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { PrimaryButton, SecondaryButton } from '../components/Button';
-import LoadingIndicator from '../components/LoadingIndicator';
 import ErrorState from '../components/ErrorState';
 import FormInput from '../components/FormInput';
 import { SectionHeader } from '../components/SectionHeader';
@@ -17,6 +16,7 @@ import LabeledText from '../components/LabeledText';
 import FormModal from '../components/FormModal';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateLearningStatus } from '../store/learningListSlice';
 
 const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
@@ -332,7 +332,23 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    };
 
    if (loading && !refreshing) {
-      return <LoadingIndicator message="Loading profile..." />;
+      return (
+         <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: Colors.background,
+         }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={{
+               marginTop: Spacing.md,
+               fontSize: Typography.sizes.medium,
+               color: Colors.textSecondary,
+            }}>
+               Loading profile...
+            </Text>
+         </View>
+      );
    }
 
    if (error && !refreshing) {

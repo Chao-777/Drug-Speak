@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, Text, Alert, AppState, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, Alert, AppState, Platform, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider } from 'react-redux';
@@ -18,11 +18,11 @@ import LearningScreen from './screens/Learning';
 import SignUpScreen from './screens/SignUp';
 import SignInScreen from './screens/SignIn';
 import UserProfileScreen from './screens/UserProfile';
+import CommunityScreen from './screens/Community';
 import AuthService from './api/authService';
 import UserService from './api/userService';
 import LearningDataService from './api/learningDataService';
 import * as SplashScreen from 'expo-splash-screen';
-import LoadingIndicator from './components/LoadingIndicator';
 import EmptyState from './components/EmptyState';
 import AudioRecorderManager from './services/AudioRecorderManager';
 import RecordService from './api/recordService';
@@ -112,6 +112,21 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
     }
   };
   
+  const handleCommunityPress = () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        "Login Required",
+        "You need to be logged in to access the Community rankings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign In", onPress: () => setActiveTab('profile') }
+        ]
+      );
+    } else {
+      setActiveTab('community');
+    }
+  };
+  
   return (
     <View style={{
       flexDirection: 'row',
@@ -188,7 +203,7 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
           alignItems: 'center',
           opacity: activeTab === 'community' ? 1 : 0.6,
         }}
-        onPress={() => setActiveTab('community')}
+        onPress={handleCommunityPress}
       >
         <Icon name="people" size={24} color={activeTab === 'community' ? Colors.primary : Colors.textSecondary} />
         <Text style={{
@@ -257,6 +272,25 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn, authStateKey }) => {
     );
   }
 };
+
+// Custom loading component to replace LoadingIndicator
+const LoadingView = ({ message = "Loading..." }) => (
+  <View style={{ 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: Colors.background
+  }}>
+    <ActivityIndicator size="large" color={Colors.primary} />
+    <Text style={{ 
+      marginTop: Spacing.md,
+      fontSize: Typography.sizes.medium,
+      color: Colors.textSecondary
+    }}>
+      {message}
+    </Text>
+  </View>
+);
 
 const MainApp = () => {
   const [activeTab, setActiveTab] = useState('drugs');
@@ -356,7 +390,7 @@ const MainApp = () => {
   };
 
   if (loading) {
-    return <LoadingIndicator message="Loading..." />;
+    return <LoadingView message="Loading..." />;
   }
 
   const renderContent = () => {
@@ -404,15 +438,20 @@ const MainApp = () => {
         }
       
       case 'community':
-        return (
-          <Stack.Navigator screenOptions={headerOptions}>
-            <Stack.Screen 
-              name="Community" 
-              component={() => <PlaceholderScreen title="Community" />} 
-              options={{ title: 'Community' }} 
-            />
-          </Stack.Navigator>
-        );
+        if (isLoggedIn) {
+          return (
+            <Stack.Navigator screenOptions={headerOptions}>
+              <Stack.Screen 
+                name="Community" 
+                component={CommunityScreen} 
+                options={{ title: 'Community' }} 
+              />
+            </Stack.Navigator>
+          );
+        } else {
+          setActiveTab('profile');
+          return null;
+        }
       
       case 'profile':
         return <ProfileNavigator isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} authStateKey={authStateKey.current} />;
@@ -467,7 +506,7 @@ export default function App() {
 
   return (
     <Provider store={store}>
-      <PersistGate loading={<LoadingIndicator />} persistor={persistor}>
+      <PersistGate loading={<LoadingView message="Loading..." />} persistor={persistor}>
         <SafeAreaProvider onLayout={onLayoutRootView}>
           <StatusBar style="dark" /> 
           <NavigationContainer>

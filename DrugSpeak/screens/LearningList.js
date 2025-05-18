@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, RefreshControl, SafeAreaView, FlatList, Alert } from 'react-native';
+import { View, RefreshControl, SafeAreaView, FlatList, Alert, ActivityIndicator, Text } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { Colors, Spacing } from '../constants/color';
+import { Colors, Spacing, Typography } from '../constants/color';
 import RecordService from '../api/recordService';
 import AuthService from '../api/authService';
 import DrugCard from '../components/DrugCard';
@@ -10,7 +10,6 @@ import {ExpandableSectionHeader} from '../components/SectionHeader';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import StatsBar from '../components/StatsBar';
-import LoadingIndicator from '../components/LoadingIndicator';
 import { updateLearningStatus, removeFromLearningList, setLearningList } from '../store/learningListSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LearningDataService from '../api/learningDataService';
@@ -390,7 +389,23 @@ const LearningListScreen = ({ navigation }) => {
    }, [learningList]);
 
    if (loading && !refreshing) {
-      return <LoadingIndicator message="Loading your study progress..." />;
+      return (
+         <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: Colors.background,
+         }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={{
+               marginTop: Spacing.md,
+               fontSize: Typography.sizes.medium,
+               color: Colors.textSecondary,
+            }}>
+               Loading your study progress...
+            </Text>
+         </View>
+      );
    }
 
    if (error && !refreshing) {

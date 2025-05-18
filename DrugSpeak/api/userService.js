@@ -109,6 +109,71 @@ const UserService = {
          console.error('Error getting recording counts:', error);
          return { total: 0 };
       }
+   },
+
+   /**
+    * Get a list of all users with their rankings
+    * @returns {Promise<Array>} List of users with score data
+    */
+   getUsers: async () => {
+      try {
+         try {
+            // Try to fetch from server
+            const response = await apiClient.get('/users/rankings');
+            return response.data;
+         } catch (error) {
+            // If the API is not implemented yet (404), create mock data
+            if (error.response?.status === 404) {
+               // Get current user for comparison
+               const currentUser = await AuthService.getCurrentUser();
+               
+               // Create mock user data
+               let mockUsers = [
+                  { id: '1', name: 'Emma Johnson', email: 'emma@example.com', score: 950 },
+                  { id: '2', name: 'Noah Smith', email: 'noah@example.com', score: 920 },
+                  { id: '3', name: 'Olivia Williams', email: 'olivia@example.com', score: 890 },
+                  { id: '4', name: 'Liam Brown', email: 'liam@example.com', score: 850 },
+                  { id: '5', name: 'Ava Jones', email: 'ava@example.com', score: 820 },
+                  { id: '6', name: 'Ethan Miller', email: 'ethan@example.com', score: 780 },
+                  { id: '7', name: 'Sophia Davis', email: 'sophia@example.com', score: 750 },
+                  { id: '8', name: 'Mason Wilson', email: 'mason@example.com', score: 700 },
+                  { id: '9', name: 'Isabella Taylor', email: 'isabella@example.com', score: 650 },
+                  { id: '10', name: 'Logan Martinez', email: 'logan@example.com', score: 600 },
+               ];
+               
+               // Add current user to the mock data if available
+               if (currentUser) {
+                  // Check if user already exists in the list
+                  const userExists = mockUsers.some(u => 
+                     u.id === currentUser.id || 
+                     u._id === currentUser._id || 
+                     u.email === currentUser.email
+                  );
+                  
+                  // If not, add them with a random score
+                  if (!userExists) {
+                     const userScore = Math.floor(Math.random() * 500) + 500;
+                     mockUsers.push({
+                        id: currentUser.id || currentUser._id,
+                        name: currentUser.name,
+                        email: currentUser.email,
+                        score: userScore
+                     });
+                  }
+               }
+               
+               // Sort by score
+               mockUsers.sort((a, b) => b.score - a.score);
+               
+               return mockUsers;
+            }
+            
+            throw error;
+         }
+      } catch (error) {
+         console.error('Error fetching users:', error);
+         return [];
+      }
    }
 };
 
