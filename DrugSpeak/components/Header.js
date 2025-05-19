@@ -6,7 +6,6 @@ const Header = ({ title }) => {
    return (
       <View
          style={{
-         backgroundColor: Colors.secondary,
          padding: Spacing.md,
          alignItems: 'center',
          borderBottomWidth: Borders.width.thin,

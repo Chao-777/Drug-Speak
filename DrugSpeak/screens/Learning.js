@@ -1,16 +1,414 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
-import { useDispatch } from 'react-redux';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Spacing, Typography, Borders } from '../constants/color';
-import PronunciationCard from '../components/PronunciationCard';
-import { removeFromLearningList } from '../store/learningListSlice';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, SafeAreaView, View, Text, Alert } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { removeFromLearningList, updateLearningStatus, updateDrugScore } from '../store/learningListSlice';
 import { drugCategory } from '../data/resource';
+import RecordService from '../api/recordService';
+import AuthService from '../api/authService';
+import { Colors, Typography, Spacing } from '../constants/color';
+import PronunciationCard from '../components/PronunciationCard';
+import DrugHeader from '../components/DrugHeader';
+import ContentSection from '../components/ContentSection';
+import LabeledText from '../components/LabeledText';
+import {SectionHeader} from '../components/SectionHeader';
+import {RecordButton} from '../components/Button';
+import RecordingItem from '../components/RecordingItem';
+import BottomActionBar from '../components/BottomActionBar';
+import AudioRecorderManager from '../services/AudioRecorderManager';
+import AudioComparisonService from '../services/AudioComparisonService';
 
 const LearningScreen = ({ route, navigation }) => {
    const { drug } = route.params;
+   const learningList = useSelector(state => state.learningList.learningList || []);
    const dispatch = useDispatch();
    const [openDropdownId, setOpenDropdownId] = useState(null);
+   const [isLoading, setIsLoading] = useState(false);
+   const [studyStats, setStudyStats] = useState({
+      currentLearning: 0,
+      finishedLearning: 0,
+      totalScore: 0
+   });
+   const [userData, setUserData] = useState(null);
+   const [recording, setRecording] = useState();
+   const [isRecording, setIsRecording] = useState(false);
+   const [recordings, setRecordings] = useState([]);
+   const [sound, setSound] = useState(null);
+   const [playingRecordingId, setPlayingRecordingId] = useState(null);
+   const [isUploading, setIsUploading] = useState(false);
+
+   const currentLearning = learningList.filter(item => item.status === 'current');
+   const finishedLearning = learningList.filter(item => item.status === 'finished');
+
+   const RECORDINGS_STORAGE_KEY = `recordings_${drug.id}`;
+
+   const [evaluatingRecordingId, setEvaluatingRecordingId] = useState(null);
+   const [isUpdatingStats, setIsUpdatingStats] = useState(false);
+   const [drugScore, setDrugScore] = useState(0);
+   
+   // Evaluate recording and update score
+   const evaluateRecording = async (recordingId) => {
+      try {
+         setEvaluatingRecordingId(recordingId);
+         
+         const recordingToEvaluate = recordings.find(rec => rec.id === recordingId);
+         if (!recordingToEvaluate) {
+            throw new Error('Recording not found');
+         }
+         
+         // Get reference audio to compare with
+         const instructorAudio = drug.sounds && drug.sounds.length > 0 
+            ? drug.sounds[0].file 
+            : null;
+            
+         if (!instructorAudio) {
+            throw new Error('No reference audio available for comparison');
+         }
+         
+         // Stop any currently playing audio
+         await stopAnyPlayback();
+         
+         // Compare the audio files and get a score
+         const score = await AudioComparisonService.compareAudio(
+            recordingToEvaluate.uri,
+            instructorAudio
+         );
+         
+         // Update the recording with the new score
+         const updatedRecordings = recordings.map(rec => 
+            rec.id === recordingId 
+               ? { ...rec, score } 
+               : rec
+         );
+         
+         setRecordings(updatedRecordings);
+         
+         // Get previous highest score for this drug
+         const previousHighestScore = drugScore || 0;
+         
+         // If this new score is higher than the previous highest
+         if (score > previousHighestScore) {
+            // Update local drug score
+            setDrugScore(score);
+            
+            // Update in Redux store
+            dispatch(updateDrugScore({
+               id: drug.id,
+               score: score
+            }));
+            
+            // Update the study record on the backend
+            await updateStudyRecordStats();
+         }
+         
+         // Save the updated recordings
+         await saveRecordings(updatedRecordings);
+         
+         // Alert the user of their score
+         Alert.alert(
+            "Evaluation Complete",
+            `Your pronunciation score: ${score}${score > previousHighestScore ? "\n\nThis is a new high score!" : ""}`
+         );
+      } catch (error) {
+         console.error('Error evaluating recording:', error);
+         Alert.alert('Error', error.message || 'Failed to evaluate recording');
+      } finally {
+         setEvaluatingRecordingId(null);
+      }
+   };
+
+   // Initialize data on component mount
+   useEffect(() => {
+      const loadData = async () => {
+         try {
+            // Get current user using AuthService
+            const user = await AuthService.getCurrentUser();
+            if (user) {
+               setUserData(user);
+               
+               try {
+                  // Fetch study record from backend
+                  const record = await RecordService.getStudyRecordById(user.id);
+                  if (record) {
+                     setStudyStats({
+                        currentLearning: record.currentLearning || 0,
+                        finishedLearning: record.finishedLearning || 0,
+                        totalScore: record.totalScore || 0
+                     });
+                  }
+               } catch (error) {
+                  if (error.message === "Study record not found for this user." || 
+                        (error.response && error.response.status === 404)) {
+                     
+                     // Create initial study record
+                     const newStats = {
+                        currentLearning: currentLearning.length,
+                        finishedLearning: finishedLearning.length,
+                        totalScore: 0
+                     };
+                     
+                     await RecordService.upsertStudyRecord(newStats);
+                     setStudyStats(newStats);
+                  } else {
+                     console.error('Error fetching study record:', error);
+                  }
+               }
+            }
+         } catch (error) {
+            console.error('Error loading user data:', error);
+         }
+      };
+
+      // Set initial drug score from learning list
+      const drugInList = learningList.find(item => item.id === drug.id);
+      if (drugInList && drugInList.score) {
+         setDrugScore(drugInList.score);
+      }
+      
+      loadData();
+      loadRecordings();
+      setupAudioRecording();
+      
+      // Cleanup function
+      return () => {
+         if (recording) {
+            recording.stopAndUnloadAsync();
+         }
+         stopAnyPlayback();
+      };
+   }, []);
+
+   // Helper to update study record stats
+   const updateStudyRecordStats = async () => {
+      try {
+         const user = await AuthService.getCurrentUser();
+         if (!user) return;
+         
+         const stats = {
+            currentLearning: currentLearning.length,
+            finishedLearning: finishedLearning.length,
+            totalScore: calculateTotalScore()
+         };
+         
+         await RecordService.upsertStudyRecord(stats);
+         setStudyStats(stats);
+      } catch (error) {
+         console.error('Error updating study stats:', error);
+      }
+   };
+   
+   // Calculate total score across all drugs
+   const calculateTotalScore = () => {
+      return learningList.reduce((total, drug) => total + (drug.score || 0), 0);
+   };
+
+   // Audio recording setup
+   const setupAudioRecording = async () => {
+      try {
+         await AudioRecorderManager.requestPermissions();
+      } catch (err) {
+         console.error('Failed to get recording permissions', err);
+         Alert.alert('Permission Error', 'Cannot access microphone. Please check app permissions.');
+      }
+   };
+
+   // Load recordings from storage and backend
+   const loadRecordings = async () => {
+      try {
+         const savedRecordings = await AudioRecorderManager.loadStoredRecordings(RECORDINGS_STORAGE_KEY);
+         setRecordings(savedRecordings);
+      } catch (error) {
+         console.error('Error loading recordings:', error);
+         Alert.alert('Error', 'Failed to load your recordings');
+      }
+   };
+   
+   // Save recordings to storage and backend
+   const saveRecordings = async (updatedRecordings) => {
+      try {
+         await AudioRecorderManager.saveRecordings(RECORDINGS_STORAGE_KEY, updatedRecordings);
+      } catch (error) {
+         console.error('Error saving recordings:', error);
+         Alert.alert('Error', 'Failed to save your recording');
+      }
+   };
+
+   // Start recording audio
+   const startRecording = async () => {
+      try {
+         await setupAudioRecording();
+         await stopAnyPlayback();
+         
+         const newRecording = await AudioRecorderManager.startNewRecording();
+         setRecording(newRecording);
+         setIsRecording(true);
+      } catch (err) {
+         console.error('Failed to start recording', err);
+         Alert.alert('Error', 'Failed to start recording');
+      }
+   };
+
+   // Stop recording audio and upload to server
+   const stopRecording = async () => {
+      try {
+         if (!recording) return;
+         
+         setIsUploading(true);
+         
+         // Stop the recording and get local URI
+         const uri = await AudioRecorderManager.stopRecording(recording);
+         
+         // Create recording metadata
+         const recordingId = Date.now().toString();
+         const newRecording = {
+            id: recordingId,
+            uri,
+            timestamp: new Date().toISOString(),
+            evaluation: 'pending',
+            uploaded: false
+         };
+         
+         // Update local state immediately for better UX
+         const updatedRecordings = [...recordings, newRecording];
+         setRecordings(updatedRecordings);
+         
+         // Save to local storage first
+         await saveRecordings(updatedRecordings);
+         
+         // Upload the audio file to the server
+         try {
+            const serverUrl = await AudioRecorderManager.uploadAudioFile(uri, drug.id, recordingId);
+            
+            // Update the recording with the server URL and uploaded status
+            const finalRecordings = updatedRecordings.map(rec => 
+               rec.id === recordingId 
+                  ? { ...rec, uri: serverUrl, uploaded: true } 
+                  : rec
+            );
+            
+            // Update state and save final version with server URL
+            setRecordings(finalRecordings);
+            await saveRecordings(finalRecordings);
+         } catch (uploadError) {
+            console.error('Error uploading recording to server:', uploadError);
+            // We'll keep the local URI if upload fails
+         }
+         
+         setRecording(undefined);
+         setIsRecording(false);
+      } catch (err) {
+         console.error('Failed to stop recording', err);
+         Alert.alert('Error', 'Failed to save recording');
+      } finally {
+         setIsUploading(false);
+      }
+   };
+
+   const stopAnyPlayback = async () => {
+      if (sound) {
+         try {
+            await AudioRecorderManager.stopSound(sound);
+            setSound(null);
+            setPlayingRecordingId(null);
+         } catch (error) {
+            console.error('Error stopping playback:', error);
+         }
+      }
+   };
+
+   // Play a recording, handling both local and server URIs
+   const playRecording = async (recordingId) => {
+      try {
+         if (playingRecordingId === recordingId) {
+            await stopAnyPlayback();
+            return;
+         }
+         
+         await stopAnyPlayback();
+         
+         const recordingToPlay = recordings.find(rec => rec.id === recordingId);
+         if (!recordingToPlay) {
+            console.error('Recording not found:', recordingId);
+            return;
+         }
+         
+         let uri = recordingToPlay.uri;
+         
+         // If it's a server URL and not a local file path, download/cache it first
+         if (uri && uri.startsWith('http')) {
+            try {
+               uri = await AudioRecorderManager.downloadAudioFile(
+                  uri, 
+                  `drug_${drug.id}_recording_${recordingId}.m4a`
+               );
+            } catch (downloadError) {
+               console.error('Error downloading audio from server:', downloadError);
+               // Continue with original URI if download fails
+            }
+         }
+         
+         const newSound = await AudioRecorderManager.playSound(uri);
+         
+         newSound.setOnPlaybackStatusUpdate(status => {
+            if (status.didJustFinish) {
+               setPlayingRecordingId(null);
+            }
+         });
+         
+         setSound(newSound);
+         setPlayingRecordingId(recordingId);
+      } catch (err) {
+         console.error('Failed to play recording:', err);
+         Alert.alert('Error', 'Failed to play recording');
+         setPlayingRecordingId(null);
+      }
+   };
+
+   // Delete a recording from both local storage and backend
+   const deleteRecording = (recordingId) => {
+      Alert.alert(
+         "Delete Recording",
+         "Are you sure you want to delete this recording? This will remove it from both your device and the cloud.",
+         [
+            {
+               text: "Cancel",
+               style: "cancel"
+            },
+            {
+               text: "Delete",
+               style: "destructive",
+               onPress: async () => {
+                  try {
+                     // Stop playback if deleting currently playing recording
+                     if (playingRecordingId === recordingId) {
+                        await stopAnyPlayback();
+                     }
+                     
+                     // Delete the recording using the enhanced method
+                     await AudioRecorderManager.deleteRecording(RECORDINGS_STORAGE_KEY, recordingId);
+                     
+                     // Update local state
+                     const updatedRecordings = recordings.filter(rec => rec.id !== recordingId);
+                     setRecordings(updatedRecordings);
+                  } catch (error) {
+                     console.error('Error deleting recording:', error);
+                     Alert.alert('Error', 'Failed to delete recording');
+                  }
+               }
+            }
+         ]
+      );
+   };
+
+   const formatTimestamp = (timestamp) => {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      
+      return date.toLocaleString('en-US', {
+         month: 'short',
+         day: 'numeric',
+         hour: '2-digit',
+         minute: '2-digit'
+      });
+   };
 
    const getCategoryNames = (categoryIds) => {
       if (!categoryIds || !Array.isArray(categoryIds)) return '';
@@ -21,14 +419,52 @@ const LearningScreen = ({ route, navigation }) => {
       }).join(', ');
    };
 
-   const handleFinish = () => {
-      console.log(`Marking ${drug.name} as finished`);
-      navigation.goBack();
+   // Mark drug as finished
+   const handleFinish = async () => {
+      try {
+         setIsLoading(true);
+         
+         // Update Redux state
+         dispatch(updateLearningStatus({ id: drug.id, status: 'finished' }));
+         
+         // Update backend study record
+         await updateStudyRecordStats();
+         
+         Alert.alert(
+            "Success",
+            `${drug.name} marked as finished!`,
+            [{ text: "OK", onPress: () => navigation.goBack() }]
+         );
+      } catch (error) {
+         console.error('Error updating study record:', error);
+         Alert.alert(
+            "Error",
+            error.message || "Failed to update study record",
+            [{ text: "OK" }]
+         );
+      } finally {
+         setIsLoading(false);
+      }
    };
 
-   const handleRemove = () => {
-      dispatch(removeFromLearningList(drug.id));
-      navigation.goBack();
+   // Remove drug from learning list
+   const handleRemove = async () => {
+      try {
+         setIsLoading(true);
+         
+         // Update Redux state
+         dispatch(removeFromLearningList(drug.id));
+         
+         // Update backend study record
+         await updateStudyRecordStats();
+         
+         navigation.goBack();
+      } catch (error) {
+         console.error('Error updating study record:', error);
+         navigation.goBack();
+      } finally {
+         setIsLoading(false);
+      }
    };
 
    const handleToggleDropdown = (id) => {
@@ -36,180 +472,85 @@ const LearningScreen = ({ route, navigation }) => {
    };
 
    return (
-      <SafeAreaView style={{
-         flex: 1,
-         backgroundColor: Colors.background,
-      }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
          <ScrollView>
-         <View style={{
-            padding: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-            alignItems: 'center',
-            borderBottomWidth: Borders.width.thin,
-            borderBottomColor: Colors.border,
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.heading,
-               fontWeight: Typography.weights.bold,
-               color: Colors.textPrimary,
-               textAlign: 'center',
-            }}>
-               {drug.name}
-            </Text>
-            <Text style={{
-               fontSize: Typography.sizes.body,
-               color: Colors.textSecondary,
-               marginTop: Spacing.xs,
-            }}>
-               {drug.molecular_formula}
-            </Text>
-         </View>
-
-         <View style={{
-            padding: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-            borderBottomWidth: Borders.width.thin,
-            borderBottomColor: Colors.border,
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.body,
-               color: Colors.textPrimary,
-            }}>
-               <Text style={{ fontWeight: Typography.weights.bold }}>
-               Categories: 
-               </Text>
-               {' '}{getCategoryNames(drug.categories)}
-            </Text>
-         </View>
-
-         <View style={{
-            padding: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-            borderBottomWidth: Borders.width.thin,
-            borderBottomColor: Colors.border,
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.body,
-               color: Colors.textPrimary,
-               lineHeight: Typography.sizes.body * 1.5,
-            }}>
-               {drug.desc}
-            </Text>
-         </View>
-
-         <View style={{
-            padding: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.subtitle,
-               fontWeight: Typography.weights.bold,
-               color: Colors.textPrimary,
-               marginBottom: Spacing.sm,
-            }}>
-               Pronunciation
-            </Text>
-            {drug.sounds && drug.sounds.map((sound, index) => (
-               <PronunciationCard 
-               key={`${drug.id}_${sound.gender}`}
-               id={`${drug.id}_${sound.gender}`}
-               drugName={drug.name} 
-               gender={sound.gender}
-               audioFile={sound.file}
-               isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
-               onToggleDropdown={handleToggleDropdown}
-               />
-            ))}
-         </View>
-
-         {/* Record Section */}
-         <View style={{
-            padding: Spacing.lg,
-            backgroundColor: Colors.cardBackground,
-            marginTop: Spacing.md,
-            borderTopWidth: Borders.width.thin,
-            borderTopColor: Colors.border,
-         }}>
-            <Text style={{
-               fontSize: Typography.sizes.subtitle,
-               fontWeight: Typography.weights.bold,
-               color: Colors.textPrimary,
-               marginBottom: Spacing.md,
-            }}>
-               Practice Pronunciation
-            </Text>
+         <DrugHeader 
+            name={drug.name} 
+            formula={drug.molecular_formula}
+            isInLearningList={true}
+            score={drugScore} 
+            />
             
-            <TouchableOpacity style={{
-               width: 120,
-               height: 120,
-               borderRadius: 60,
-               backgroundColor: '#000080', // Dark blue
-               justifyContent: 'center',
-               alignItems: 'center',
-               alignSelf: 'center',
-               marginBottom: Spacing.md,
-            }}>
+            <ContentSection>
+               <LabeledText 
+                  label="Categories" 
+                  value={getCategoryNames(drug.categories)} 
+               />
+            </ContentSection>
+            
+            <ContentSection>
                <Text style={{
-               color: 'white',
-               fontWeight: Typography.weights.bold,
-               fontSize: Typography.sizes.body,
-               textAlign: 'center',
+                  fontSize: Typography.sizes.body,
+                  color: Colors.textPrimary,
+                  lineHeight: Typography.sizes.body * 1.5,
                }}>
-               Hold to Record
+                  {drug.desc}
                </Text>
-            </TouchableOpacity>
-         </View>
+            </ContentSection>
+            
+            <ContentSection noBorder>
+               <SectionHeader title="Pronunciation" />
+               
+               {drug.sounds && drug.sounds.map((sound) => (
+                  <PronunciationCard 
+                     key={`${drug.id}_${sound.gender}`}
+                     id={`${drug.id}_${sound.gender}`}
+                     drugName={drug.name} 
+                     gender={sound.gender}
+                     audioFile={sound.file}
+                     isDropdownOpen={openDropdownId === `${drug.id}_${sound.gender}`}
+                     onToggleDropdown={handleToggleDropdown}
+                  />
+               ))}
+            </ContentSection>
+            
+            <ContentSection style={{ marginTop: Spacing.md }}>
+               <SectionHeader title="Practice Pronunciation" />
+               
+               <RecordButton 
+                  isRecording={isRecording} 
+                  onPressIn={startRecording} 
+                  onPressOut={stopRecording} 
+                  isLoading={isUploading}
+               />
+               
+               {recordings.length > 0 && (
+                  <View style={{ marginTop: Spacing.md }}>
+                     <SectionHeader title={`My Recordings (${recordings.length})`} />
+                     
+                     {recordings.map(recording => (
+                     <RecordingItem 
+                        key={recording.id} 
+                        recording={recording}
+                        playingRecordingId={playingRecordingId}
+                        onPlayPress={playRecording}
+                        onDeletePress={deleteRecording}
+                        onEvaluatePress={evaluateRecording}
+                        formatTimestamp={formatTimestamp}
+                        isEvaluating={evaluatingRecordingId === recording.id}
+                        isUploaded={recording.uploaded}
+                     />
+                     ))}
+                  </View>
+               )}
+            </ContentSection>
          </ScrollView>
          
-         {/* Fixed bottom navigation bar */}
-         <View style={{
-         flexDirection: 'row',
-         justifyContent: 'space-between',
-         borderTopWidth: 1,
-         borderTopColor: Colors.border,
-         paddingVertical: Spacing.sm,
-         paddingHorizontal: Spacing.lg,
-         backgroundColor: Colors.cardBackground,
-         }}>
-         <TouchableOpacity
-            style={{
-               flexDirection: 'row',
-               alignItems: 'center',
-            }}
-            onPress={handleRemove}
-         >
-            <Icon name="delete-outline" size={24} color={Colors.error} />
-            <Text style={{
-               marginLeft: Spacing.xs,
-               color: Colors.error,
-               fontSize: Typography.sizes.body,
-            }}>
-               Remove
-            </Text>
-         </TouchableOpacity>
-         
-         <TouchableOpacity
-            style={{
-               flexDirection: 'row',
-               alignItems: 'center',
-               backgroundColor: Colors.primary,
-               paddingVertical: Spacing.sm,
-               paddingHorizontal: Spacing.md,
-               borderRadius: Borders.radius.medium,
-            }}
-            onPress={handleFinish}
-         >
-            <Icon name="check" size={20} color="white" />
-            <Text style={{
-               marginLeft: Spacing.xs,
-               color: 'white',
-               fontWeight: Typography.weights.bold,
-               fontSize: Typography.sizes.body,
-            }}>
-               Finish
-            </Text>
-         </TouchableOpacity>
-         </View>
+         <BottomActionBar 
+            onRemove={handleRemove}
+            onFinish={handleFinish}
+            isLoading={isLoading}
+         />
       </SafeAreaView>
    );
 };

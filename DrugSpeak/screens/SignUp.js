@@ -1,35 +1,88 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Typography, Spacing } from '../constants/color';
+import { View, StyleSheet, Text } from 'react-native';
+import { Colors, Spacing, Typography } from '../constants/color';
 import AuthService from '../api/authService';
+
+import FormContainer from '../components/FormContainer';
+import FormTitle from '../components/FormTitle';
+import FormInput from '../components/FormInput';
+import { PrimaryButton, SecondaryButton } from '../components/Button';
+import TextLink from '../components/TextLink';
+import GenderSelector from '../components/GenderSelector';
 
 const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const [userName, setUserName] = useState('');
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
+   const [confirmPassword, setConfirmPassword] = useState('');
    const [gender, setGender] = useState('');
    const [loading, setLoading] = useState(false);
+   const [validationErrors, setValidationErrors] = useState({});
+   const [error, setError] = useState('');
+
+   const validateForm = () => {
+      const errors = {};
+      
+      // Username validation
+      if (!userName) {
+         errors.userName = 'Username is required';
+      } else if (userName.length < 3) {
+         errors.userName = 'Username must be at least 3 characters';
+      }
+      
+      // Email validation
+      if (!email) {
+         errors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(email)) {
+         errors.email = 'Please enter a valid email';
+      }
+      
+      // Password validation
+      if (!password) {
+         errors.password = 'Password is required';
+      } else if (password.length < 6) {
+         errors.password = 'Password must be at least 6 characters';
+      }
+      
+      // Confirm password validation
+      if (!confirmPassword) {
+         errors.confirmPassword = 'Please confirm your password';
+      } else if (confirmPassword !== password) {
+         errors.confirmPassword = 'Passwords do not match';
+      }
+      
+      // Gender validation
+      if (!gender) {
+         errors.gender = 'Please select a gender';
+      }
+      
+      setValidationErrors(errors);
+      return Object.keys(errors).length === 0;
+   };
 
    const handleSignUp = async () => {
-      if (!userName || !email || !password || !gender) {
-         alert('Please fill in all fields');
+      setError('');
+      
+      if (!validateForm()) {
          return;
       }
-   
+      
       setLoading(true);
       try {
-         await AuthService.register({
+         const result = await AuthService.register({
             username: userName,
             email,
             password,
             gender,
          });
-   
-         alert('Signup successful!');
+         
+         // Save email for easier sign in next time
+         await AuthService.saveLastEmail(email);
+         
+         // Success!
          setIsLoggedIn(true);
       } catch (error) {
-         alert(error.message);
+         setError(error.message || 'Registration failed. Please try again.');
       } finally {
          setLoading(false);
       }
@@ -39,7 +92,10 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
       setUserName('');
       setEmail('');
       setPassword('');
+      setConfirmPassword('');
       setGender('');
+      setValidationErrors({});
+      setError('');
    };
 
    const navigateToSignIn = () => {
@@ -47,212 +103,125 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    };
 
    return (
-      <View style={styles.container}>
-         <View style={styles.formContainer}>
-         <Text style={styles.title}>Sign up a New User</Text>
+      <FormContainer>
+         <FormTitle title="Sign up a New User" />
          
-         <Text style={styles.label}>User Name</Text>
-         <TextInput
-            style={styles.input}
+         {error ? (
+            <View style={styles.errorContainer}>
+               <Text style={styles.errorText}>{error}</Text>
+            </View>
+         ) : null}
+         
+         <FormInput
+            label="User Name"
             value={userName}
-            onChangeText={setUserName}
+            onChangeText={(text) => {
+               setUserName(text);
+               setValidationErrors(prev => ({...prev, userName: ''}));
+            }}
             placeholder="Enter your name"
             editable={!loading}
+            error={validationErrors.userName}
          />
          
-         <Text style={styles.label}>Gender</Text>
-         <View style={styles.genderContainer}>
-            <TouchableOpacity
-               style={[
-                  styles.genderButton,
-                  gender === 'male' && styles.genderButtonSelected,
-                  loading && styles.disabledButton
-               ]}
-               onPress={() => setGender('male')}
-               disabled={loading}
-            >
-               <Text style={[
-                  styles.genderButtonText,
-                  gender === 'male' && styles.genderButtonTextSelected
-               ]}>Male</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-               style={[
-                  styles.genderButton,
-                  gender === 'female' && styles.genderButtonSelected,
-                  loading && styles.disabledButton
-               ]}
-               onPress={() => setGender('female')}
-               disabled={loading}
-            >
-               <Text style={[
-                  styles.genderButtonText,
-                  gender === 'female' && styles.genderButtonTextSelected
-               ]}>Female</Text>
-            </TouchableOpacity>
-         </View>
+
          
-         <Text style={styles.label}>Email</Text>
-         <TextInput
-            style={styles.input}
+         <GenderSelector
+            selectedGender={gender}
+            onSelectGender={(value) => {
+               setGender(value);
+               setValidationErrors(prev => ({...prev, gender: ''}));
+            }}
+            disabled={loading}
+            error={validationErrors.gender}
+         />
+         
+         <FormInput
+            label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+               setEmail(text);
+               setValidationErrors(prev => ({...prev, email: ''}));
+            }}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
+            error={validationErrors.email}
          />
          
-         <Text style={styles.label}>Password</Text>
-         <TextInput
-            style={styles.input}
+         <FormInput
+            label="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+               setPassword(text);
+               setValidationErrors(prev => ({...prev, password: ''}));
+            }}
             placeholder="Create a password"
             secureTextEntry
             editable={!loading}
+            error={validationErrors.password}
+         />
+         
+         <FormInput
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={(text) => {
+               setConfirmPassword(text);
+               setValidationErrors(prev => ({...prev, confirmPassword: ''}));
+            }}
+            placeholder="Confirm your password"
+            secureTextEntry
+            editable={!loading}
+            error={validationErrors.confirmPassword}
          />
          
          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-               style={[styles.clearButton, loading && styles.disabledButton]} 
+            <SecondaryButton
+               title="Clear"
+               icon="clear"  
                onPress={handleClear}
                disabled={loading}
-            >
-               <Icon name="clear" size={16} color="white" />
-               <Text style={styles.buttonText}>Clear</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-               style={[styles.signUpButton, loading && styles.disabledButton]} 
+               style={styles.clearButton}
+            />
+         
+            <PrimaryButton
+               title="Sign Up"
+               icon="person-add"  
                onPress={handleSignUp}
+               loading={loading}
                disabled={loading}
-            >
-               {loading ? (
-                  <ActivityIndicator size="small" color="white" />
-               ) : (
-                  <>
-                     <Icon name="person-add" size={16} color="white" />
-                     <Text style={styles.buttonText}>Sign Up</Text>
-                  </>
-               )}
-            </TouchableOpacity>
+            />
          </View>
          
-         <TouchableOpacity 
-            style={styles.switchContainer} 
+         <TextLink
+            text="Already have an account? Sign in here! →"
             onPress={navigateToSignIn}
             disabled={loading}
-         >
-            <Text style={styles.switchText}>Already have an account? Sign in here! →</Text>
-         </TouchableOpacity>
-         </View>
-      </View>
+         />
+      </FormContainer>
    );
 };
 
 const styles = StyleSheet.create({
-   container: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'white',
-      padding: Spacing.md,
-   },
-   formContainer: {
-      width: '100%',
-      backgroundColor: '#F1F1F1',
-      padding: Spacing.lg,
-      borderRadius: 8,
-      shadowColor: Colors.shadow,
-   },
-   title: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Typography.textPrimary,
-      marginBottom: Spacing.lg,
-   },
-   label: {
-      fontSize: Typography.sizes.body,
-      color: Typography.textPrimary,
-      marginTop: Spacing.sm,
-      marginBottom: Spacing.xs,
-   },
-   input: {
-      backgroundColor: 'white',
-      borderRadius: 4,
-      padding: Spacing.md,
-      fontSize: Typography.sizes.body,
-      color: Colors.textPrimary,
-      marginBottom: Spacing.md,
-   },
-   genderContainer: {
-      flexDirection: 'row',
-      justifyContent: 'flex-start',
-      marginBottom: Spacing.md,
-   },
-   genderButton: {
-      backgroundColor: '#ECECEC',
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: 20,
-      minWidth: 80,
-      alignItems: 'center',
-      marginRight: Spacing.md,
-      borderWidth: 1,
-      borderColor: '#DDDDDD',
-   },
-   genderButtonSelected: {
-      backgroundColor: Colors.primary,
-      borderColor: Colors.primary,
-   },
-   genderButtonText: {
-      color: Colors.textSecondary,
-      fontWeight: Typography.weights.medium,
-   },
-   genderButtonTextSelected: {
-      color: 'white',
-   },
    buttonContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: Spacing.md,
    },
    clearButton: {
-      backgroundColor: 'darkblue',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: Spacing.md,
-      borderRadius: 4,
-      flex: 1,
       marginRight: Spacing.md,
    },
-   signUpButton: {
-      backgroundColor: Colors.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: Spacing.md,
-      borderRadius: 4,
-      flex: 1,
+   errorContainer: {
+      backgroundColor: Colors.error + '20',
+      borderRadius: 5,
+      padding: Spacing.sm,
+      marginBottom: Spacing.md,
    },
-   disabledButton: {
-      opacity: 0.7,
-   },
-   buttonText: {
-      color: 'white',
-      marginLeft: Spacing.xs,
-      fontWeight: Typography.weights.medium,
-   },
-   switchContainer: {
-      alignItems: 'center',
-      marginTop: Spacing.xl,
-   },
-   switchText: {
-      color: 'darkblue',
-      fontSize: Typography.sizes.small,
+   errorText: {
+      color: Colors.error,
+      fontSize: Typography.sizes.body,
+      textAlign: 'center',
    },
 });
 

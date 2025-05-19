@@ -1,13 +1,79 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Colors, Typography, Spacing, Borders } from '../constants/color';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text } from 'react-native';
+import { Colors, Spacing, Borders, Typography } from '../constants/color';
 import AuthService from '../api/authService';
+import UserService from '../api/userService';
+import RecordService from '../api/recordService';
+import { useSelector } from 'react-redux';
+import Header from '../components/Header';
+import { PrimaryButton, SecondaryButton } from '../components/Button';
+import ErrorState from '../components/ErrorState';
+import FormInput from '../components/FormInput';
+import { SectionHeader } from '../components/SectionHeader';
+import ContentSection from '../components/ContentSection';
+import StatsBar from '../components/StatsBar';
+import LabeledText from '../components/LabeledText';
+import FormModal from '../components/FormModal';
+import LoadingIndicator from '../components/LoadingIndicator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import UserDataHelper from '../utils/UserDataHelper';
 
-const UserProfileScreen = ({ navigation }) => {
+const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const [user, setUser] = useState(null);
    const [loading, setLoading] = useState(true);
+   const [refreshing, setRefreshing] = useState(false);
+   const [syncing, setSyncing] = useState(false);
    const [error, setError] = useState(null);
+   const [studyStats, setStudyStats] = useState({
+      currentLearning: 0,
+      finishedLearning: 0,
+      totalScore: 0
+   });
+   
+   const [showEditModal, setShowEditModal] = useState(false);
+   const [username, setUsername] = useState('');
+   const [password, setPassword] = useState('');
+   const [confirmPassword, setConfirmPassword] = useState('');
+   const [updateLoading, setUpdateLoading] = useState(false);
+   const [validationErrors, setValidationErrors] = useState({});
+   
+   const learningList = useSelector(state => state.learningList.learningList || []);
+   const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
+   const finishedLearningCount = learningList.filter(drug => drug.status === 'finished').length;
+
+   // Calculate total score from learning list using the helper
+   const calculateTotalScore = () => {
+      return UserDataHelper.calculateTotalScore(learningList);
+   };
+
+   useEffect(() => {
+      const syncStats = async () => {
+         if (studyStats.currentLearning !== currentLearningCount || 
+            studyStats.finishedLearning !== finishedLearningCount) {
+            
+            setSyncing(true);
+            try {
+               const user = await UserDataHelper.getCurrentUserSafe();
+               if (user && (user.id || user._id)) {
+                  const newStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: calculateTotalScore()
+                  };
+                  
+                  await RecordService.upsertStudyRecord(newStats);
+                  setStudyStats(newStats);
+               }
+            } catch (error) {
+               console.error('Error syncing stats from Redux state:', error);
+            } finally {
+               setSyncing(false);
+            }
+         }
+      };
+      
+      syncStats();
+   }, [currentLearningCount, finishedLearningCount]);
 
    useEffect(() => {
       const unsubscribe = navigation.addListener('focus', () => {
@@ -22,98 +88,377 @@ const UserProfileScreen = ({ navigation }) => {
       setError(null);
       
       try {
-         const userData = await AuthService.getCurrentUser();
-         setUser(userData);
+         // Check if user is logged in
+         const isLoggedIn = await UserDataHelper.isUserLoggedIn();
+         if (!isLoggedIn) {
+            setError('Authentication required. Please log in again.');
+            setLoading(false);
+            return;
+         }
+         
+         // Attempt to get fresh data from server first
+         try {
+            const refreshedUser = await UserService.getUserProfile();
+            if (refreshedUser) {
+               setUser(refreshedUser);
+               setUsername(refreshedUser?.username || '');
+            } else {
+               throw new Error('Failed to fetch user profile');
+            }
+         } catch (refreshError) {
+            console.error('Error fetching user profile:', refreshError);
+            // If server refresh fails, fall back to cached data
+            const userData = await UserDataHelper.getCurrentUserSafe();
+            if (!userData) {
+               throw new Error('User data not available. Please log in again.');
+            }
+            setUser(userData);
+            setUsername(userData?.username || '');
+         }
+         
+         // Now get the study record if we have a user
+         const userData = await UserDataHelper.getCurrentUserSafe();
+         if (userData && (userData.id || userData._id)) {
+            try {
+               const userId = userData.id || userData._id;
+               const record = await RecordService.getStudyRecordById(userId);
+               
+               const remoteStats = {
+                  currentLearning: record.currentLearning || 0,
+                  finishedLearning: record.finishedLearning || 0,
+                  totalScore: record.totalScore || 0
+               };
+               
+               if (remoteStats.currentLearning !== currentLearningCount || 
+                  remoteStats.finishedLearning !== finishedLearningCount ||
+                  remoteStats.totalScore !== calculateTotalScore()) {
+                  
+                  const updatedStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: calculateTotalScore()
+                  };
+                  
+                  await RecordService.upsertStudyRecord(updatedStats);
+                  setStudyStats(updatedStats);
+               } else {
+                  setStudyStats(remoteStats);
+               }
+            } catch (error) {
+               if (error.message === "Study record not found for this user." || 
+                  (error.response && error.response.status === 404)) {
+                  
+                  const newStats = {
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: calculateTotalScore()
+                  };
+                  
+                  try {
+                     await RecordService.upsertStudyRecord(newStats);
+                     setStudyStats(newStats);
+                  } catch (createError) {
+                     console.error('Error creating new record:', createError);
+                  }
+               } else {
+                  console.error('Error loading study record:', error);
+                  // Don't throw here, just use local stats
+                  setStudyStats({
+                     currentLearning: currentLearningCount,
+                     finishedLearning: finishedLearningCount,
+                     totalScore: calculateTotalScore()
+                  });
+               }
+            }
+         }
       } catch (error) {
          setError(error.message || 'Failed to load profile');
-         Alert.alert('Error', error.message || 'Failed to load profile');
+         console.error('Error loading profile:', error);
       } finally {
          setLoading(false);
+         setRefreshing(false);
       }
+   };
+
+   const onRefresh = useCallback(() => {
+      setRefreshing(true);
+      loadUserProfile();
+   }, []);
+
+   const validateForm = () => {
+      const errors = {};
+      
+      // Username validation
+      if (!username.trim()) {
+         errors.username = 'Username cannot be empty';
+      } else if (username.trim().length < 3) {
+         errors.username = 'Username must be at least 3 characters';
+      }
+      
+      // Password validation (only if user entered something)
+      if (password) {
+         if (password.length < 6) {
+            errors.password = 'Password must be at least 6 characters';
+         }
+         
+         if (password !== confirmPassword) {
+            errors.confirmPassword = 'Passwords do not match';
+         }
+      } else if (confirmPassword) {
+         errors.password = 'Password is required if confirmation is provided';
+      }
+      
+      setValidationErrors(errors);
+      return Object.keys(errors).length === 0;
    };
 
    const handleUpdate = () => {
-      navigation.navigate('EditProfile', { user });
+      setValidationErrors({});
+      setShowEditModal(true);
    };
    
-   const handleSignOut = async () => {
+   const handleUpdateSubmit = async () => {
+      if (!validateForm()) {
+         return;
+      }
+      
+      setUpdateLoading(true);
+      
       try {
-         await AuthService.logout();
-         navigation.reset({
-            index: 0,
-            routes: [{ name: 'SignIn' }]
-         });
+         const updateData = {
+            username: username.trim()
+         };
+         
+         if (password) {
+            updateData.password = password;
+         }
+         
+         const updatedUser = await UserService.updateProfile(updateData);
+         
+         await AuthService.updateCurrentUser(updatedUser);
+         setUser(updatedUser);
+         
+         setPassword('');
+         setConfirmPassword('');
+         
+         setShowEditModal(false);
+         Alert.alert('Success', 'Profile updated successfully');
+         
+         loadUserProfile();
       } catch (error) {
-         Alert.alert('Error', 'Failed to sign out. Please try again.');
+         Alert.alert('Error', error.message || 'Failed to update profile');
+      } finally {
+         setUpdateLoading(false);
       }
    };
 
-   if (loading) {
-      return (
-         <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Loading profile...</Text>
-         </View>
+   const handleCloseModal = () => {
+      setShowEditModal(false);
+      setPassword('');
+      setConfirmPassword('');
+      setUsername(user?.username || '');
+      setValidationErrors({});
+   };
+   
+   const handleSignOut = async () => {
+      Alert.alert(
+         "Sign Out", 
+         "Are you sure you want to sign out?", 
+         [
+            {
+               text: "Cancel",
+               style: "cancel"
+            },
+            {
+               text: "Sign Out",
+               onPress: async () => {
+                  try {
+                     // Show a loading indicator
+                     setLoading(true);
+                     
+                     // Clear any UI data first for immediate response
+                     setUser(null);
+                     
+                     // Perform final sync before logout - use a special flag
+                     await AsyncStorage.setItem('finalSync', 'true');
+                     
+                     // Now sync any final data
+                     try {
+                        const userData = await UserDataHelper.getCurrentUserSafe();
+                        if (userData && (userData.id || userData._id)) {
+                           const finalStats = {
+                              currentLearning: currentLearningCount,
+                              finishedLearning: finishedLearningCount,
+                              totalScore: calculateTotalScore()
+                           };
+                           await RecordService.upsertStudyRecord(finalStats);
+                        }
+                     } catch (syncError) {
+                        console.error('Final sync failed:', syncError.message);
+                     }
+                     
+                     // Clear final sync flag
+                     await AsyncStorage.removeItem('finalSync');
+                     
+                     // Add a delay to allow pending operations to complete
+                     await new Promise(resolve => setTimeout(resolve, 3000));
+                     
+                     // First log the user out
+                     const logoutSuccess = await AuthService.logout();
+                     
+                     // Add a short delay to ensure storage operations complete
+                     setTimeout(() => {
+                        // Then ensure UI is updated
+                        if (setIsLoggedIn) {
+                           setIsLoggedIn(false);
+                        }
+                        // Loading indicator will be hidden in finally block
+                     }, 100);
+                  } catch (error) {
+                     console.error('Error signing out:', error);
+                     Alert.alert('Error', 'Failed to sign out. Please try again.');
+                     setLoading(false);
+                  }
+               }
+            }
+         ]
       );
+   };
+
+   if (loading && !refreshing) {
+      return <LoadingIndicator.FullScreen message="Loading profile..." />;
    }
 
-   if (error) {
-      return (
-         <View style={styles.errorContainer}>
-            <Icon name="error-outline" size={50} color={Colors.error} />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity 
-               style={styles.retryButton}
-               onPress={loadUserProfile}
-            >
-               <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-         </View>
-      );
+   if (error && !refreshing) {
+      return <ErrorState message={error} onRetry={loadUserProfile} />;
    }
 
    return (
-      <View style={styles.container}>
-         <View style={styles.header}>
-            <Text style={styles.headerTitle}>User Profile</Text>
-         </View>
+      <ScrollView 
+         style={styles.container}
+         refreshControl={
+            <RefreshControl
+               refreshing={refreshing}
+               onRefresh={onRefresh}
+               colors={[Colors.primary]}
+            />
+         }
+      >
+         <Header title="User Profile" />
          
-         <View style={styles.profileContainer}>
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>User Name:</Text>
-               <Text style={styles.value}>{user?.username || 'N/A'}</Text>
-            </View>
+         <ContentSection style={styles.infoSection}>
+            <LabeledText 
+               label="User Name" 
+               value={user?.username || 'N/A'} 
+               style={styles.infoRow}
+            />
             
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>Email:</Text>
-               <Text style={styles.value}>{user?.email || 'N/A'}</Text>
-            </View>
+            <LabeledText 
+               label="Email" 
+               value={user?.email || 'N/A'} 
+               style={styles.infoRow}
+            />
             
-            <View style={styles.infoRow}>
-               <Text style={styles.label}>Gender:</Text>
-               <Text style={styles.value}>{user?.gender || 'N/A'}</Text>
-            </View>
-         </View>
+            <LabeledText 
+               label="Gender" 
+               value={user?.gender || 'N/A'} 
+               style={styles.infoRow}
+            />
+         </ContentSection>
+         
+         <ContentSection>
+            <SectionHeader title="Study Statistics" />
+            
+            <StatsBar 
+               learningList={learningList}
+               isSyncing={syncing}
+            />
+         </ContentSection>
          
          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-               style={styles.updateButton}
+            <PrimaryButton 
+               title="Update"
+               icon="edit"
                onPress={handleUpdate}
-            >
-               <Icon name="edit" size={18} color="white" />
-               <Text style={styles.buttonText}>Update</Text>
-            </TouchableOpacity>
+               style={styles.actionButton}
+            />
             
-            <TouchableOpacity 
-               style={styles.signOutButton}
+            <SecondaryButton 
+               title="Sign Out"
+               icon="logout"
                onPress={handleSignOut}
-            >
-               <Icon name="logout" size={18} color="white" />
-               <Text style={styles.buttonText}>Sign Out</Text>
-            </TouchableOpacity>
+               style={styles.actionButton}
+            />
          </View>
-      </View>
+         
+         <FormModal
+            visible={showEditModal}
+            onClose={handleCloseModal}
+            onSubmit={handleUpdateSubmit}
+            title="Update Profile"
+            isLoading={updateLoading}
+         >
+            <FormInput
+               label="Username"
+               value={username}
+               onChangeText={(text) => {
+                  setUsername(text);
+                  if (validationErrors.username) {
+                     setValidationErrors({...validationErrors, username: ''});
+                  }
+               }}
+               placeholder="Enter username"
+               editable={!updateLoading}
+               error={validationErrors.username}
+            />
+            
+            <FormInput
+               label="New Password (optional)"
+               value={password}
+               onChangeText={(text) => {
+                  setPassword(text);
+                  if (validationErrors.password) {
+                     setValidationErrors({...validationErrors, password: ''});
+                  }
+               }}
+               placeholder="Enter new password"
+               secureTextEntry
+               editable={!updateLoading}
+               error={validationErrors.password}
+            />
+            
+            <FormInput
+               label="Confirm Password"
+               value={confirmPassword}
+               onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (validationErrors.confirmPassword) {
+                     setValidationErrors({...validationErrors, confirmPassword: ''});
+                  }
+               }}
+               placeholder="Confirm new password"
+               secureTextEntry
+               editable={!updateLoading}
+               error={validationErrors.confirmPassword}
+            />
+         </FormModal>
+      </ScrollView>
    );
+};
+
+const formatDate = (dateString) => {
+   if (!dateString) return 'N/A';
+   
+   try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+         month: 'long',
+         day: 'numeric',
+         year: 'numeric'
+      });
+   } catch (e) {
+      return 'N/A';
+   }
 };
 
 const styles = StyleSheet.create({
@@ -121,55 +466,8 @@ const styles = StyleSheet.create({
       flex: 1,
       backgroundColor: Colors.background,
    },
-   loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: Colors.background,
-   },
-   loadingText: {
-      marginTop: Spacing.md,
-      fontSize: Typography.sizes.body,
-      color: Colors.textPrimary,
-   },
-   errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: Colors.background,
-      padding: Spacing.lg,
-   },
-   errorText: {
-      marginTop: Spacing.md,
-      fontSize: Typography.sizes.body,
-      color: Colors.error,
-      textAlign: 'center',
-      marginBottom: Spacing.lg,
-   },
-   retryButton: {
-      backgroundColor: Colors.primary,
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-   },
-   retryButtonText: {
-      color: 'white',
-      fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-   },
-   header: {
-      padding: Spacing.md,
-      alignItems: 'center',
-      borderBottomWidth: 1,
-      borderBottomColor: Colors.border,
-   },
-   headerTitle: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary,
-   },
-   profileContainer: {
-      padding: Spacing.lg,
+   infoSection: {
+      marginTop: Spacing.lg,
    },
    infoRow: {
       flexDirection: 'row',
@@ -177,50 +475,41 @@ const styles = StyleSheet.create({
       borderBottomWidth: 1,
       borderBottomColor: Colors.border,
    },
-   label: {
-      flex: 1,
-      fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-      color: Colors.textPrimary,
-   },
-   value: {
-      flex: 1,
-      fontSize: Typography.sizes.body,
-      color: Colors.textSecondary,
-      textAlign: 'right',
-   },
    buttonContainer: {
       flexDirection: 'row',
       justifyContent: 'space-around',
       padding: Spacing.lg,
+      marginTop: Spacing.sm,
+      marginBottom: Spacing.xl,
+   },
+   actionButton: {
+      marginHorizontal: Spacing.sm,
+      flex: 1,
+   },
+   profileHeader: {
+      alignItems: 'center',
+      padding: Spacing.lg,
+      backgroundColor: Colors.glass.background,
+      borderRadius: Borders.radius.medium,
+      marginHorizontal: Spacing.md,
       marginTop: Spacing.lg,
+      shadowColor: Colors.glass.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 5,
    },
-   updateButton: {
-      backgroundColor: Colors.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-      minWidth: 120,
+   welcomeText: {
+      fontSize: Typography.sizes.heading,
+      fontWeight: Typography.weights.bold,
+      color: Colors.textPrimary,
+      marginTop: Spacing.md,
    },
-   signOutButton: {
-      backgroundColor: 'darkblue',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: Spacing.md,
-      paddingHorizontal: Spacing.lg,
-      borderRadius: Borders.radius.medium,
-      minWidth: 120,
-   },
-   buttonText: {
-      color: 'white',
+   joinedText: {
       fontSize: Typography.sizes.body,
-      fontWeight: Typography.weights.medium,
-      marginLeft: Spacing.xs,
-   },
+      color: Colors.textSecondary,
+      marginTop: Spacing.xs,
+   }
 });
 
 export default UserProfileScreen;
