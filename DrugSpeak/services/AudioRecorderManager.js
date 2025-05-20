@@ -6,6 +6,20 @@ import AuthService from '../api/authService';
 import RecordService from '../api/recordService';
 
 const AudioRecorderManager = {
+   // Generate a storage key that includes both user ID and drug ID for isolation
+   _getUserSpecificStorageKey: async (drugId) => {
+      try {
+         const user = await AuthService.getCurrentUser();
+         if (!user || (!user.id && !user._id)) {
+            return `recordings_${drugId}_anonymous`;
+         }
+         return `recordings_${drugId}_user_${user.id || user._id}`;
+      } catch (error) {
+         console.error('Error generating user-specific storage key:', error);
+         return `recordings_${drugId}_anonymous`;
+      }
+   },
+
    requestPermissions: async () => {
       try {
          await Audio.requestPermissionsAsync();
@@ -22,8 +36,17 @@ const AudioRecorderManager = {
 
    loadStoredRecordings: async (storageKey) => {
       try {
+         // Get drug ID from the storage key
+         const drugId = storageKey.split('_')[1];
+         if (!drugId) {
+            return [];
+         }
+         
+         // Use user-specific storage key instead
+         const userSpecificKey = await AudioRecorderManager._getUserSpecificStorageKey(drugId);
+         
          // Try local cache first for faster access
-         const savedRecordings = await AsyncStorage.getItem(storageKey);
+         const savedRecordings = await AsyncStorage.getItem(userSpecificKey);
          if (savedRecordings) {
             return JSON.parse(savedRecordings);
          }
@@ -35,18 +58,12 @@ const AudioRecorderManager = {
                return [];
             }
             
-            // Get drugId from storageKey
-            const drugId = storageKey.split('_')[1];
-            if (!drugId) {
-               return [];
-            }
-            
-            // Fetch recordings from backend
-            const response = await apiClient.get(`/recordings/${drugId}`);
+            // Fetch recordings from backend with user ID filter
+            const response = await apiClient.get(`/recordings/${drugId}?userId=${user.id || user._id}`);
             const recordings = response.data;
             
             // Cache the recordings locally for faster access
-            await AsyncStorage.setItem(storageKey, JSON.stringify(recordings));
+            await AsyncStorage.setItem(userSpecificKey, JSON.stringify(recordings));
             
             return recordings;
          } catch (serverError) {
@@ -67,9 +84,18 @@ const AudioRecorderManager = {
 
    saveRecordings: async (storageKey, recordings) => {
       try {
+         // Get drug ID from the storage key
+         const drugId = storageKey.split('_')[1];
+         if (!drugId) {
+            return true;
+         }
+         
+         // Use user-specific storage key instead
+         const userSpecificKey = await AudioRecorderManager._getUserSpecificStorageKey(drugId);
+         
          // Save to local cache first for immediate access
          const jsonValue = JSON.stringify(recordings);
-         await AsyncStorage.setItem(storageKey, jsonValue);
+         await AsyncStorage.setItem(userSpecificKey, jsonValue);
          
          // Then try to save to backend
          try {
@@ -78,14 +104,15 @@ const AudioRecorderManager = {
                return true;
             }
             
-            // Get drugId from storageKey
-            const drugId = storageKey.split('_')[1];
-            if (!drugId) {
-               return true;
-            }
+            // Add user ID to each recording
+            const recordingsWithUser = recordings.map(rec => ({
+               ...rec,
+               userId: user.id || user._id,
+               username: user.username || user.name
+            }));
             
             // Save recordings to backend
-            await apiClient.post(`/recordings/${drugId}`, { recordings });
+            await apiClient.post(`/recordings/${drugId}`, { recordings: recordingsWithUser });
             
             // Also ensure user study record is updated with current user profile
             // This fixes the issue where user gender and name might not be included
@@ -98,7 +125,6 @@ const AudioRecorderManager = {
                
                // Only update if study record exists and doesn't have proper user data
                if (studyRecord && (!studyRecord.username || !studyRecord.gender || !studyRecord.user)) {
-
                   
                   const updatedRecord = {
                      ...studyRecord,
@@ -147,6 +173,11 @@ const AudioRecorderManager = {
             throw new Error('Audio file not found');
          }
          
+         const user = await AuthService.getCurrentUser();
+         if (!user) {
+            return uri; // Return local URI if no user
+         }
+         
          // Create form data for file upload
          const formData = new FormData();
          formData.append('audio', {
@@ -156,6 +187,8 @@ const AudioRecorderManager = {
          });
          formData.append('drugId', drugId);
          formData.append('recordingId', recordingId);
+         formData.append('userId', user.id || user._id);
+         formData.append('username', user.username || user.name || 'Anonymous');
          
          // Upload the file
          const response = await apiClient.post('/recordings/upload', formData, {
@@ -289,8 +322,17 @@ const AudioRecorderManager = {
 
    deleteRecording: async (recordingId, storageKey) => {
       try {
+         // Get drug ID from the storage key
+         const drugId = storageKey.split('_')[1];
+         if (!drugId) {
+            return false;
+         }
+         
+         // Use user-specific storage key instead
+         const userSpecificKey = await AudioRecorderManager._getUserSpecificStorageKey(drugId);
+         
          // Load existing recordings
-         const savedRecordingsStr = await AsyncStorage.getItem(storageKey);
+         const savedRecordingsStr = await AsyncStorage.getItem(userSpecificKey);
          if (!savedRecordingsStr) {
             return false;
          }
@@ -317,16 +359,15 @@ const AudioRecorderManager = {
          const updatedRecordings = savedRecordings.filter(r => r.id !== recordingId);
          
          // Save updated recordings list
-         await AsyncStorage.setItem(storageKey, JSON.stringify(updatedRecordings));
+         await AsyncStorage.setItem(userSpecificKey, JSON.stringify(updatedRecordings));
          
          // Try to delete from backend as well
          try {
-            // Extract drug ID from storage key
-            const drugId = storageKey.split('_')[1];
-            if (drugId) {
-               // Delete from backend
+            const user = await AuthService.getCurrentUser();
+            if (user) {
+               // Delete from backend with user ID
                try {
-                  await apiClient.delete(`/recordings/${drugId}/${recordingId}`);
+                  await apiClient.delete(`/recordings/${drugId}/${recordingId}?userId=${user.id || user._id}`);
                } catch (apiError) {
                   // Handle 404 (endpoint not implemented)
                   if (apiError.response?.status !== 404) {
@@ -343,6 +384,30 @@ const AudioRecorderManager = {
       } catch (error) {
          console.error('Error deleting recording:', error);
          return false;
+      }
+   },
+
+   // If user logs out, clear their recordings from AsyncStorage
+   clearUserRecordings: async () => {
+      try {
+         // Get all keys in AsyncStorage
+         const keys = await AsyncStorage.getAllKeys();
+         
+         // Find recording keys for the current user
+         const user = await AuthService.getCurrentUser();
+         if (!user) return;
+         
+         const userId = user.id || user._id;
+         const userRecordingKeys = keys.filter(key => 
+            key.startsWith('recordings_') && key.includes(`_user_${userId}`)
+         );
+         
+         // Remove these keys
+         if (userRecordingKeys.length > 0) {
+            await AsyncStorage.multiRemove(userRecordingKeys);
+         }
+      } catch (error) {
+         console.error('Error clearing user recordings:', error);
       }
    }
 };

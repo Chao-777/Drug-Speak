@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from './apiClient';
 import { setCurrentUser, clearUserData } from '../store';
 import LearningDataService from './learningDataService';
+import AudioRecorderManager from '../services/AudioRecorderManager';
 
 // Keys for data backup
 const BACKUP_LEARNING_DATA = 'backup_learning_data';
@@ -135,6 +136,13 @@ const AuthService = {
          // IMPORTANT: Get current user before clearing auth data
          const userData = await AuthService.getCurrentUser();
          const userId = userData?.id || userData?._id;
+         
+         // Clear user recordings before logging out
+         try {
+            await AudioRecorderManager.clearUserRecordings();
+         } catch (clearError) {
+            console.error('Error clearing user recordings:', clearError);
+         }
          
          // SAVE LEARNING DATA: Get current Redux state and save it
          try {
