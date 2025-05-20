@@ -10,7 +10,6 @@ export const learningListSlice = createSlice({
    initialState,
    reducers: {
       setLearningList: (state, action) => {
-         // Replace entire learning list with provided data
          state.learningList = action.payload;
       },
       addToLearningList: (state, action) => {
@@ -18,7 +17,7 @@ export const learningListSlice = createSlice({
             const drugWithStatus = {
                ...action.payload,
                status: 'current',
-               score: 0  // Initialize with zero score
+               score: 0  
             };
             state.learningList.push(drugWithStatus);
          }
@@ -37,13 +36,11 @@ export const learningListSlice = createSlice({
       }
    },
    extraReducers: (builder) => {
-      // Handle the updateDrugScore action
       builder.addCase(updateDrugScore, (state, action) => {
          const { id, score } = action.payload;
          const drugIndex = state.learningList.findIndex(drug => drug.id === id);
          
          if (drugIndex !== -1) {
-            // Only update if new score is higher than current score
             if (!state.learningList[drugIndex].score || 
                   score > state.learningList[drugIndex].score) {
                state.learningList[drugIndex].score = score;

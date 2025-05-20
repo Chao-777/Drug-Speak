@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, RefreshControl, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native';
 import { Colors, Spacing, Borders, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
@@ -41,7 +41,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const currentLearningCount = learningList.filter(drug => drug.status === 'current').length;
    const finishedLearningCount = learningList.filter(drug => drug.status === 'finished').length;
 
-   // Calculate total score from learning list using the helper
    const calculateTotalScore = () => {
       return UserDataHelper.calculateTotalScore(learningList);
    };
@@ -88,7 +87,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
       setError(null);
       
       try {
-         // Check if user is logged in
          const isLoggedIn = await UserDataHelper.isUserLoggedIn();
          if (!isLoggedIn) {
             setError('Authentication required. Please log in again.');
@@ -96,7 +94,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             return;
          }
          
-         // Attempt to get fresh data from server first
          try {
             const refreshedUser = await UserService.getUserProfile();
             if (refreshedUser) {
@@ -107,7 +104,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             }
          } catch (refreshError) {
             console.error('Error fetching user profile:', refreshError);
-            // If server refresh fails, fall back to cached data
             const userData = await UserDataHelper.getCurrentUserSafe();
             if (!userData) {
                throw new Error('User data not available. Please log in again.');
@@ -116,7 +112,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
             setUsername(userData?.username || '');
          }
          
-         // Now get the study record if we have a user
          const userData = await UserDataHelper.getCurrentUserSafe();
          if (userData && (userData.id || userData._id)) {
             try {
@@ -162,7 +157,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                   }
                } else {
                   console.error('Error loading study record:', error);
-                  // Don't throw here, just use local stats
                   setStudyStats({
                      currentLearning: currentLearningCount,
                      finishedLearning: finishedLearningCount,
@@ -188,14 +182,12 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    const validateForm = () => {
       const errors = {};
       
-      // Username validation
       if (!username.trim()) {
          errors.username = 'Username cannot be empty';
       } else if (username.trim().length < 3) {
          errors.username = 'Username must be at least 3 characters';
       }
       
-      // Password validation (only if user entered something)
       if (password) {
          if (password.length < 6) {
             errors.password = 'Password must be at least 6 characters';
@@ -273,16 +265,12 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                text: "Sign Out",
                onPress: async () => {
                   try {
-                     // Show a loading indicator
                      setLoading(true);
                      
-                     // Clear any UI data first for immediate response
                      setUser(null);
                      
-                     // Perform final sync before logout - use a special flag
                      await AsyncStorage.setItem('finalSync', 'true');
                      
-                     // Now sync any final data
                      try {
                         const userData = await UserDataHelper.getCurrentUserSafe();
                         if (userData && (userData.id || userData._id)) {
@@ -297,22 +285,16 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                         console.error('Final sync failed:', syncError.message);
                      }
                      
-                     // Clear final sync flag
                      await AsyncStorage.removeItem('finalSync');
                      
-                     // Add a delay to allow pending operations to complete
                      await new Promise(resolve => setTimeout(resolve, 3000));
                      
-                     // First log the user out
                      const logoutSuccess = await AuthService.logout();
                      
-                     // Add a short delay to ensure storage operations complete
                      setTimeout(() => {
-                        // Then ensure UI is updated
                         if (setIsLoggedIn) {
                            setIsLoggedIn(false);
                         }
-                        // Loading indicator will be hidden in finally block
                      }, 100);
                   } catch (error) {
                      console.error('Error signing out:', error);

@@ -2,9 +2,7 @@ import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { Colors, Spacing, Typography } from '../constants/color';
 
-/**
- * A reusable loading indicator component with multiple variants
- */
+
 const LoadingIndicator = ({ 
   message = "Loading...", 
   size = "large", 
@@ -13,7 +11,6 @@ const LoadingIndicator = ({
   textStyle = {},
   containerStyle = {}
 }) => {
-  // If fullScreen, use a different container style
   if (fullScreen) {
     return (
       <View style={[styles.fullScreenContainer, containerStyle]}>

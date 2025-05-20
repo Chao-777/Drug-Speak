@@ -45,7 +45,6 @@ const LearningScreen = ({ route, navigation }) => {
    const [isUpdatingStats, setIsUpdatingStats] = useState(false);
    const [drugScore, setDrugScore] = useState(0);
    
-   // Evaluate recording and update score
    const evaluateRecording = async (recordingId) => {
       try {
          setEvaluatingRecordingId(recordingId);
@@ -55,7 +54,6 @@ const LearningScreen = ({ route, navigation }) => {
             throw new Error('Recording not found');
          }
          
-         // Get reference audio to compare with
          const instructorAudio = drug.sounds && drug.sounds.length > 0 
             ? drug.sounds[0].file 
             : null;
@@ -64,16 +62,13 @@ const LearningScreen = ({ route, navigation }) => {
             throw new Error('No reference audio available for comparison');
          }
          
-         // Stop any currently playing audio
          await stopAnyPlayback();
          
-         // Compare the audio files and get a score
          const score = await AudioComparisonService.compareAudio(
             recordingToEvaluate.uri,
             instructorAudio
          );
          
-         // Update the recording with the new score
          const updatedRecordings = recordings.map(rec => 
             rec.id === recordingId 
                ? { ...rec, score } 
@@ -82,28 +77,21 @@ const LearningScreen = ({ route, navigation }) => {
          
          setRecordings(updatedRecordings);
          
-         // Get previous highest score for this drug
          const previousHighestScore = drugScore || 0;
          
-         // If this new score is higher than the previous highest
          if (score > previousHighestScore) {
-            // Update local drug score
             setDrugScore(score);
             
-            // Update in Redux store
             dispatch(updateDrugScore({
                id: drug.id,
                score: score
             }));
             
-            // Update the study record on the backend
             await updateStudyRecordStats();
          }
          
-         // Save the updated recordings
          await saveRecordings(updatedRecordings);
          
-         // Alert the user of their score
          Alert.alert(
             "Evaluation Complete",
             `Your pronunciation score: ${score}${score > previousHighestScore ? "\n\nThis is a new high score!" : ""}`
@@ -116,17 +104,14 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Initialize data on component mount
    useEffect(() => {
       const loadData = async () => {
          try {
-            // Get current user using AuthService
             const user = await AuthService.getCurrentUser();
             if (user) {
                setUserData(user);
                
                try {
-                  // Fetch study record from backend
                   const record = await RecordService.getStudyRecordById(user.id);
                   if (record) {
                      setStudyStats({
@@ -139,7 +124,6 @@ const LearningScreen = ({ route, navigation }) => {
                   if (error.message === "Study record not found for this user." || 
                         (error.response && error.response.status === 404)) {
                      
-                     // Create initial study record
                      const newStats = {
                         currentLearning: currentLearning.length,
                         finishedLearning: finishedLearning.length,
@@ -158,7 +142,6 @@ const LearningScreen = ({ route, navigation }) => {
          }
       };
 
-      // Set initial drug score from learning list
       const drugInList = learningList.find(item => item.id === drug.id);
       if (drugInList && drugInList.score) {
          setDrugScore(drugInList.score);
@@ -168,7 +151,6 @@ const LearningScreen = ({ route, navigation }) => {
       loadRecordings();
       setupAudioRecording();
       
-      // Cleanup function
       return () => {
          if (recording) {
             recording.stopAndUnloadAsync();
@@ -177,7 +159,6 @@ const LearningScreen = ({ route, navigation }) => {
       };
    }, []);
 
-   // Helper to update study record stats
    const updateStudyRecordStats = async () => {
       try {
          const user = await AuthService.getCurrentUser();
@@ -196,12 +177,10 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
    
-   // Calculate total score across all drugs
    const calculateTotalScore = () => {
       return learningList.reduce((total, drug) => total + (drug.score || 0), 0);
    };
 
-   // Audio recording setup
    const setupAudioRecording = async () => {
       try {
          await AudioRecorderManager.requestPermissions();
@@ -211,7 +190,6 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Load recordings from storage and backend
    const loadRecordings = async () => {
       try {
          const savedRecordings = await AudioRecorderManager.loadStoredRecordings(RECORDINGS_STORAGE_KEY);
@@ -222,7 +200,6 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
    
-   // Save recordings to storage and backend
    const saveRecordings = async (updatedRecordings) => {
       try {
          await AudioRecorderManager.saveRecordings(RECORDINGS_STORAGE_KEY, updatedRecordings);
@@ -232,7 +209,6 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Start recording audio
    const startRecording = async () => {
       try {
          await setupAudioRecording();
@@ -247,17 +223,14 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Stop recording audio and upload to server
    const stopRecording = async () => {
       try {
          if (!recording) return;
          
          setIsUploading(true);
          
-         // Stop the recording and get local URI
          const uri = await AudioRecorderManager.stopRecording(recording);
          
-         // Create recording metadata
          const recordingId = Date.now().toString();
          const newRecording = {
             id: recordingId,
@@ -267,30 +240,24 @@ const LearningScreen = ({ route, navigation }) => {
             uploaded: false
          };
          
-         // Update local state immediately for better UX
          const updatedRecordings = [...recordings, newRecording];
          setRecordings(updatedRecordings);
          
-         // Save to local storage first
          await saveRecordings(updatedRecordings);
          
-         // Upload the audio file to the server
          try {
             const serverUrl = await AudioRecorderManager.uploadAudioFile(uri, drug.id, recordingId);
             
-            // Update the recording with the server URL and uploaded status
             const finalRecordings = updatedRecordings.map(rec => 
                rec.id === recordingId 
                   ? { ...rec, uri: serverUrl, uploaded: true } 
                   : rec
             );
             
-            // Update state and save final version with server URL
             setRecordings(finalRecordings);
             await saveRecordings(finalRecordings);
          } catch (uploadError) {
             console.error('Error uploading recording to server:', uploadError);
-            // We'll keep the local URI if upload fails
          }
          
          setRecording(undefined);
@@ -315,7 +282,6 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Play a recording, handling both local and server URIs
    const playRecording = async (recordingId) => {
       try {
          if (playingRecordingId === recordingId) {
@@ -333,7 +299,6 @@ const LearningScreen = ({ route, navigation }) => {
          
          let uri = recordingToPlay.uri;
          
-         // If it's a server URL and not a local file path, download/cache it first
          if (uri && uri.startsWith('http')) {
             try {
                uri = await AudioRecorderManager.downloadAudioFile(
@@ -342,7 +307,6 @@ const LearningScreen = ({ route, navigation }) => {
                );
             } catch (downloadError) {
                console.error('Error downloading audio from server:', downloadError);
-               // Continue with original URI if download fails
             }
          }
          
@@ -363,7 +327,6 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Delete a recording from both local storage and backend
    const deleteRecording = (recordingId) => {
       Alert.alert(
          "Delete Recording",
@@ -378,15 +341,12 @@ const LearningScreen = ({ route, navigation }) => {
                style: "destructive",
                onPress: async () => {
                   try {
-                     // Stop playback if deleting currently playing recording
                      if (playingRecordingId === recordingId) {
                         await stopAnyPlayback();
                      }
                      
-                     // Delete the recording using the enhanced method
                      await AudioRecorderManager.deleteRecording(RECORDINGS_STORAGE_KEY, recordingId);
                      
-                     // Update local state
                      const updatedRecordings = recordings.filter(rec => rec.id !== recordingId);
                      setRecordings(updatedRecordings);
                   } catch (error) {
@@ -419,15 +379,12 @@ const LearningScreen = ({ route, navigation }) => {
       }).join(', ');
    };
 
-   // Mark drug as finished
    const handleFinish = async () => {
       try {
          setIsLoading(true);
          
-         // Update Redux state
          dispatch(updateLearningStatus({ id: drug.id, status: 'finished' }));
          
-         // Update backend study record
          await updateStudyRecordStats();
          
          Alert.alert(
@@ -447,15 +404,12 @@ const LearningScreen = ({ route, navigation }) => {
       }
    };
 
-   // Remove drug from learning list
    const handleRemove = async () => {
       try {
          setIsLoading(true);
          
-         // Update Redux state
          dispatch(removeFromLearningList(drug.id));
          
-         // Update backend study record
          await updateStudyRecordStats();
          
          navigation.goBack();

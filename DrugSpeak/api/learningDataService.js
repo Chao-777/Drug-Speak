@@ -1,14 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Key format for storing learning lists per user
 const USER_LEARNING_LIST_KEY = 'userLearningList_';
 
 const LearningDataService = {
   /**
    * Save a user's learning list directly (bypassing Redux)
-   * @param {string} userId - The user's ID
-   * @param {Array} learningList - The learning list to save
-   * @returns {Promise<boolean>} - Success status
+   * @param {string} userId 
+   * @param {Array} learningList 
+   * @returns {Promise<boolean>} 
    */
   saveLearningList: async (userId, learningList) => {
     if (!userId) {

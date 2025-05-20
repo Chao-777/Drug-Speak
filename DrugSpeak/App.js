@@ -23,20 +23,11 @@ import AuthService from './api/authService';
 import UserService from './api/userService';
 import LearningDataService from './api/learningDataService';
 import * as SplashScreen from 'expo-splash-screen';
-import EmptyState from './components/EmptyState';import RecordService from './api/recordService';
+import RecordService from './api/recordService';
 import { setLearningList } from './store/learningListSlice';
 
 SplashScreen.preventAutoHideAsync();
 
-const PlaceholderScreen = ({ title }) => (
-  <View style={{ flex: 1, backgroundColor: Colors.background }}>
-    <EmptyState 
-      icon="construction"
-      message={`${title} Screen is coming soon`}
-      iconColor={Colors.textLight}
-    />
-  </View>
-);
 
 const Stack = createStackNavigator();
 const ProfileStack = createStackNavigator();
@@ -73,7 +64,6 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
             }
           }
         } catch (error) {
-          // Error handling
         }
       };
       loadData();
@@ -88,7 +78,6 @@ export const CustomTabBar = ({ activeTab, setActiveTab, isLoggedIn }) => {
         const counts = await UserService.getRecordingCounts();
         setRecordingsBadge(counts.total || 0);
       } catch (error) {
-        // Error handling
       }
     };
     
@@ -266,7 +255,6 @@ const ProfileNavigator = ({ isLoggedIn, setIsLoggedIn, authStateKey }) => {
   }
 };
 
-// Custom loading component to replace LoadingIndicator
 const LoadingView = ({ message = "Loading..." }) => (
   <View style={{ 
     flex: 1, 
@@ -291,7 +279,6 @@ const MainApp = () => {
   const [loading, setLoading] = useState(true);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const appState = useRef(AppState.currentState);
-  const navigationRef = useRef();
   const authStateKey = useRef(0);
   const dispatch = useDispatch();
   
@@ -309,7 +296,6 @@ const MainApp = () => {
         dispatch(setLearningList(learningList));
       }
     } catch (error) {
-      // Error handling
     }
   };
 
@@ -327,7 +313,6 @@ const MainApp = () => {
               setActiveTab('drugs');
             }
           } catch (refreshError) {
-            // Not critical, continue
           }
         }
       } catch (error) {
@@ -474,7 +459,6 @@ export default function App() {
       try {
         await AuthService.isLoggedIn();
       } catch (e) {
-        // Error handling
       } finally {
         setAppIsReady(true);
       }
@@ -488,7 +472,6 @@ export default function App() {
       try {
         await SplashScreen.hideAsync();
       } catch (e) {
-        // Error handling
       }
     }
   }, [appIsReady]);

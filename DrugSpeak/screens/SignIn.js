@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { Colors, Spacing, Typography } from '../constants/color';
 import AuthService from '../api/authService';
 import FormContainer from '../components/FormContainer';
@@ -16,7 +16,6 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    const [error, setError] = useState('');
    const [restoring, setRestoring] = useState(false);
 
-   // Try to restore user's previous email if they've logged in before
    useEffect(() => {
       const restoreUserEmail = async () => {
          try {
@@ -38,14 +37,12 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
    const validateForm = () => {
       const errors = {};
       
-      // Email validation
       if (!email) {
          errors.email = 'Email is required';
       } else if (!/\S+@\S+\.\S+/.test(email)) {
          errors.email = 'Please enter a valid email';
       }
       
-      // Password validation
       if (!password) {
          errors.password = 'Password is required';
       } else if (password.length < 6) {
@@ -67,14 +64,10 @@ const SignInScreen = ({ navigation, setIsLoggedIn }) => {
       try {
          const result = await AuthService.login(email, password);
          
-         // Save user's email for future logins
          await AuthService.saveLastEmail(email);
          
-         // Very important: call setIsLoggedIn directly AFTER successful auth
          setIsLoggedIn(true);
          
-         // No need for extra steps or timeouts anymore
-         // The app will refresh based on auth state changes
       } catch (error) {
          console.error('Login error:', error.message || 'Unknown error');
          setError(error.message || 'Login failed. Please try again.');
