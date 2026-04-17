@@ -119,7 +119,7 @@ const PronunciationCard = ({ id, drugName, gender, audioFile, isDropdownOpen, on
             disabled={isLoading}
          >
             {isLoading ? (
-               <Icon name="hourglass-empty" size={24} color={Colors.textLight} />
+               <Icon name="hourglass-empty" size={24} color={Colors.textSecondary} />
             ) : isPlaying ? (
                <Icon name="stop" size={24} color={Colors.error} />
             ) : (

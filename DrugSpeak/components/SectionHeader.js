@@ -6,10 +6,12 @@ import { Typography, Colors, Spacing } from '../constants/color';
 const SectionHeader = ({ title, style }) => {
    return (
       <Text style={[{
-         fontSize: Typography.sizes.subtitle,
-         fontWeight: Typography.weights.bold,
-         color: Colors.textPrimary,
+         fontSize: Typography.sizes.small,
+         fontWeight: Typography.weights.semiBold,
+         color: Colors.primary,
          marginBottom: Spacing.sm,
+         textTransform: 'uppercase',
+         letterSpacing: 0.8,
       }, style]}>
          {title}
       </Text>

@@ -3,10 +3,10 @@ import { View, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Colors, Typography, Spacing } from '../constants/color';
 
-const EmptyState = ({ 
-   icon = "library-add", 
-   iconSize = 60, 
-   iconColor = Colors.textLight,
+const EmptyState = ({
+   icon = "library-add",
+   iconSize = 60,
+   iconColor = Colors.textSecondary,
    message = "No items found.",
    style
 }) => (

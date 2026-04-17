@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
-import { Typography, Spacing } from '../constants/color';
+import { Colors, Typography, Spacing } from '../constants/color';
 
 const FormTitle = ({ title, style }) => {
    return (
@@ -12,10 +12,11 @@ const FormTitle = ({ title, style }) => {
 
 const styles = StyleSheet.create({
    title: {
-      fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
-      color: Typography.textPrimary,
+      fontSize: Typography.sizes.subtitle,
+      fontWeight: Typography.weights.semiBold,
+      color: Colors.textPrimary,
       marginBottom: Spacing.lg,
+      letterSpacing: 0.2,
    },
 });
 

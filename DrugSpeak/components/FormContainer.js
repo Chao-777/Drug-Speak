@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Colors, Spacing } from '../constants/color';
+import { Spacing } from '../constants/color';
 
 const FormContainer = ({ children, style }) => {
    return (
@@ -22,10 +22,14 @@ const styles = StyleSheet.create({
    },
    formContainer: {
       width: '100%',
-      backgroundColor: '#F1F1F1',
+      backgroundColor: '#F5F5F7',
       padding: Spacing.lg,
-      borderRadius: 8,
-      shadowColor: Colors.shadow,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 3,
    },
 });
 

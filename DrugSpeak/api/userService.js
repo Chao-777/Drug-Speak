@@ -48,17 +48,14 @@ const UserService = {
             
             return userData;
          } catch (apiError) {
-            // If endpoint is not implemented (404), use cached data without error
             if (apiError.response?.status === 404) {
                const cachedData = await AuthService.getCurrentUser();
                if (cachedData) return cachedData;
                throw new Error('No user data available');
             }
-            // Rethrow other errors
             throw apiError;
          }
       } catch (error) {
-         // Only log detailed error for non-404 errors
          if (error.response?.status !== 404) {
             console.error('Error fetching user profile:', error);
          }
@@ -72,12 +69,10 @@ const UserService = {
    
    getRecordingCounts: async () => {
       try {
-         // Attempt to get from server first
          try {
             const response = await apiClient.get('/users/recording-counts');
             return response.data;
          } catch (error) {
-            // If server fails, calculate from local storage
             const userData = await AuthService.getCurrentUser();
             if (!userData) return { total: 0 };
             
@@ -112,22 +107,19 @@ const UserService = {
 
    /**
     * Get a list of all users with their rankings
-    * @returns {Promise<Array>} List of users with score data
+    * @returns {Promise<Array>} 
     */
    getUsers: async () => {
       try {
          try {
-            // Try to fetch from server - main users endpoint
             const response = await apiClient.get('/users');
             return response.data;
          } catch (error) {
             if (error.response?.status === 404) {
-               // Try to get user data from study records
                try {
                   const studyRecords = await apiClient.get('/study-records');
                   
                   if (studyRecords.data && Array.isArray(studyRecords.data)) {
-                     // Extract unique users from study records
                      const users = [];
                      const userIds = new Set();
                      
@@ -135,7 +127,6 @@ const UserService = {
                         if (record.userId && !userIds.has(record.userId)) {
                            userIds.add(record.userId);
                            
-                           // Try to get user details from record or defaults
                            users.push({
                               id: record.userId,
                               name: record.username || `User ${record.userId.substring(0, 5)}`,
@@ -145,7 +136,6 @@ const UserService = {
                         }
                      }
                      
-                     // Make sure current user is included
                      const currentUser = await AuthService.getCurrentUser();
                      if (currentUser && !userIds.has(currentUser.id || currentUser._id)) {
                         users.push(currentUser);
@@ -154,10 +144,9 @@ const UserService = {
                      return users;
                   }
                } catch (studyError) {
-                  // Error handling, no need for log
+               
                }
                
-               // As a last resort, return just the current user
                const currentUser = await AuthService.getCurrentUser();
                
                return currentUser ? [currentUser] : [];
@@ -168,7 +157,6 @@ const UserService = {
       } catch (error) {
          console.error('Error fetching users:', error);
          
-         // Fall back to current user only - NO MOCK DATA
          try {
             const currentUser = await AuthService.getCurrentUser();
             return currentUser ? [currentUser] : [];

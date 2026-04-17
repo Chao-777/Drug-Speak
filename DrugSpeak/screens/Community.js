@@ -14,7 +14,6 @@ import AuthService from '../api/authService';
 import RecordService from '../api/recordService';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-// Import reusable components
 import EmptyState from '../components/EmptyState';
 import Header from '../components/Header';
 
@@ -31,12 +30,10 @@ const CommunityScreen = ({ navigation }) => {
     setError(null);
     
     try {
-      // Get current user first
       const user = await AuthService.getCurrentUser();
       setCurrentUser(user);
       const currentUserId = user?.id || user?._id;
       
-      // Get all study records
       let studyRecords = [];
       try {
         studyRecords = await RecordService.getAllStudyRecords();
@@ -45,30 +42,23 @@ const CommunityScreen = ({ navigation }) => {
         studyRecords = [];
       }
       
-      // Process study records
       const userRankings = [];
       const processedUserIds = new Set();
       
-      // Process each study record
       for (const record of studyRecords) {
-        // Skip invalid records
         if (!record || !record.userId) continue;
         
-        // Skip already processed users
         if (processedUserIds.has(record.userId)) continue;
         processedUserIds.add(record.userId);
         
-        // Check if the record has a nested user object
         const userProfile = record.user || {};
         
-        // Try multiple potential field names for username and gender
         const username = record.username || record.name || 
-                         userProfile.username || userProfile.name || 
-                         `User ${record.userId.substring(0, 5)}`;
-                         
+                        userProfile.username || userProfile.name || 
+                        `User ${record.userId.substring(0, 5)}`;
+                        
         const gender = record.gender || userProfile.gender || 'Not specified';
         
-        // Add to rankings
         userRankings.push({
           userId: record.userId,
           username: username,
@@ -79,21 +69,17 @@ const CommunityScreen = ({ navigation }) => {
         });
       }
       
-      // Make sure current user is included only if they're logged in
       if (currentUserId && !processedUserIds.has(currentUserId)) {
         try {
-          // Try to get user's study record
           const userRecord = await RecordService.getStudyRecordById(currentUserId);
           
           if (userRecord) {
-            // Check if the record has a nested user object
             const userProfile = userRecord.user || {};
             
-            // Try multiple potential field names for username and gender
             const username = userRecord.username || userRecord.name || 
-                             userProfile.username || userProfile.name || 
-                             user.name || user.username || user.email?.split('@')[0] || 'You';
-                             
+                            userProfile.username || userProfile.name || 
+                            user.name || user.username || user.email?.split('@')[0] || 'You';
+                            
             const gender = userRecord.gender || userProfile.gender || user.gender || 'Not specified';
             
             userRankings.push({
@@ -105,7 +91,7 @@ const CommunityScreen = ({ navigation }) => {
               finishedLearning: userRecord.finishedLearning || 0
             });
           } else {
-            // No study record, add with zero values
+
             userRankings.push({
               userId: currentUserId,
               username: user.name || user.username || user.email?.split('@')[0] || 'You',
@@ -116,7 +102,6 @@ const CommunityScreen = ({ navigation }) => {
             });
           }
         } catch (error) {
-          // Error getting study record, add with zero values
           userRankings.push({
             userId: currentUserId,
             username: user.name || user.username || user.email?.split('@')[0] || 'You',
@@ -128,19 +113,16 @@ const CommunityScreen = ({ navigation }) => {
         }
       }
       
-      // Sort by score (descending)
       const sortedRankings = userRankings.sort((a, b) => b.score - a.score);
       setRankings(sortedRankings);
       
-      // Find current user's rank
       if (currentUserId) {
         const userRank = sortedRankings.findIndex(item => item.userId === currentUserId);
         
         if (userRank >= 0) {
-          setCurrentUserRank(userRank + 1); // +1 because array is 0-indexed
+          setCurrentUserRank(userRank + 1); 
         }
       } else {
-        // Reset current user rank if no user is logged in
         setCurrentUserRank(null);
       }
     } catch (error) {
@@ -161,7 +143,6 @@ const CommunityScreen = ({ navigation }) => {
     fetchRankings(true);
   };
   
-  // Header for the table
   const renderTableHeader = () => (
     <View>
       <Header title="Student Community" />
@@ -175,12 +156,10 @@ const CommunityScreen = ({ navigation }) => {
     </View>
   );
   
-  // Table row item
   const renderRankingItem = ({ item, index }) => {
     const isCurrentUser = currentUser && 
       (item.userId === currentUser.id || item.userId === currentUser._id);
     
-    // Make sure we have something to display for username
     const displayName = item.username || `User ${item.userId.substring(0, 5)}`;
       
     return (
@@ -199,7 +178,7 @@ const CommunityScreen = ({ navigation }) => {
           {item.gender || 'Not specified'}
         </Text>
         <Text style={[styles.cellText, styles.progressColumn]}>
-          {item.score}({item.currentLearning})({item.finishedLearning})
+          {item.score} / {item.currentLearning} / {item.finishedLearning}
         </Text>
       </View>
     );
@@ -208,7 +187,7 @@ const CommunityScreen = ({ navigation }) => {
   const renderFooterNote = () => (
     <View style={styles.footerNote}>
       <Text style={styles.footerText}>
-        * The Progress shows Total Score (Current Learning) (Finished)
+        * Progress: Score / Current / Finished
       </Text>
     </View>
   );
@@ -266,7 +245,6 @@ const CommunityScreen = ({ navigation }) => {
         }
       />
       
-      {/* Show user rank info when logged in */}
       {currentUserRank && (
         <View style={styles.yourRankContainer}>
           <Text style={styles.yourRankText}>
@@ -275,7 +253,6 @@ const CommunityScreen = ({ navigation }) => {
         </View>
       )}
       
-      {/* Show login prompt when not logged in */}
       {!currentUser && rankings.length > 0 && (
         <TouchableOpacity 
           style={styles.loginContainer}
@@ -290,7 +267,6 @@ const CommunityScreen = ({ navigation }) => {
   );
 };
 
-// Styling for the table layout
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -304,7 +280,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: Spacing.md,
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     color: Colors.textSecondary,
   },
   errorContainer: {
@@ -316,7 +292,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: Spacing.md,
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     color: Colors.error,
     textAlign: 'center',
   },
@@ -328,7 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: Colors.white,
+    color: 'white',
     fontWeight: Typography.weights.bold,
   },
   list: {
@@ -339,9 +315,9 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: Colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.primaryDark,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
   },
@@ -351,15 +327,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'white',
   },
   highlightedRow: {
-    backgroundColor: Colors.highlight,
+    backgroundColor: Colors.primary + '18',
   },
   headerText: {
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semiBold,
+    color: 'white',
     fontSize: Typography.sizes.small,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   cellText: {
     color: Colors.textPrimary,
@@ -382,7 +360,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressColumn: {
-    width: 100,
+    width: 110,
     textAlign: 'right',
   },
   footerNote: {
@@ -406,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   yourRankText: {
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
     color: 'white',
   },
@@ -420,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginText: {
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
     color: 'white',
   },

@@ -14,15 +14,13 @@ const StatItem = ({ label, value, color }) => (
 );
 
 const StatsBar = ({ 
-   learningList = [], // Default to empty array if undefined
+   learningList = [],
    currentCount,
    finishedCount,
    totalScore,
    isSyncing = false,
    style 
 }) => {
-   // Calculate stats from learning list only if learningList is provided
-   // Otherwise use the provided counts
    const currentLearning = learningList && learningList.length > 0 
       ? learningList.filter(drug => drug.status === 'current')
       : [];
@@ -31,17 +29,13 @@ const StatsBar = ({
       ? learningList.filter(drug => drug.status === 'finished')
       : [];
    
-   // Calculate total score only if learningList is provided
    const calculateTotalScore = () => {
-      // If learningList is not provided, use the passed in totalScore
       if (!learningList || learningList.length === 0) {
          return totalScore || 0;
       }
       
-      // Start with base score of 0
       let calculatedScore = 0;
       
-      // Add highest score from each drug
       learningList.forEach(drug => {
          if (drug.score) {
             calculatedScore += drug.score;
@@ -51,7 +45,6 @@ const StatsBar = ({
       return calculatedScore;
    };
 
-   // Determine what values to display
    const displayCurrentCount = learningList && learningList.length > 0 
       ? currentLearning.length 
       : (currentCount || 0);
@@ -118,10 +111,12 @@ const styles = StyleSheet.create({
       fontSize: Typography.sizes.small,
       color: Colors.textSecondary,
       marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
    },
    statValue: {
       fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
+      fontWeight: Typography.weights.semiBold,
    },
    divider: {
       width: 1,

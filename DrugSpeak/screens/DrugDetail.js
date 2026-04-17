@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getDrugById, categoryArray } from '../data/drugs';
 import PronunciationCard from '../components/PronunciationCard';
 import { PrimaryButton } from '../components/Button';
-import { Colors, Typography } from '../constants/color';
+import { Colors, Typography, Spacing } from '../constants/color';
 import { addToLearningList } from '../store/learningListSlice';
 import ContentSection from '../components/ContentSection';
 import LabeledText from '../components/LabeledText';
@@ -86,7 +86,7 @@ const DrugDetailScreen = ({ route, navigation }) => {
                   <Text style={{
                      fontSize: Typography.sizes.body,
                      color: Colors.textSecondary,
-                     marginTop: Typography.sizes.xs,
+                     marginTop: Spacing.xs,
                   }}>
                      {drug.molecular_formula}
                   </Text>

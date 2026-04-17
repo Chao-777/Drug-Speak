@@ -18,7 +18,12 @@ const BottomActionBar = ({
       borderTopColor: Colors.border,
       paddingVertical: Spacing.sm,
       paddingHorizontal: Spacing.lg,
-      backgroundColor: Colors.cardBackground,
+      backgroundColor: 'white',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 4,
    }}>
       <TouchableOpacity
          style={{

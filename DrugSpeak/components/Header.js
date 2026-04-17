@@ -6,20 +6,24 @@ const Header = ({ title }) => {
    return (
       <View
          style={{
-         padding: Spacing.md,
-         alignItems: 'center',
-         borderBottomWidth: Borders.width.thin,
-         borderBottomColor: Colors.border,
+            paddingHorizontal: Spacing.lg,
+            paddingVertical: Spacing.md,
+            borderBottomWidth: Borders.width.normal,
+            borderBottomColor: Colors.border,
+            borderLeftWidth: 4,
+            borderLeftColor: Colors.primary,
+            backgroundColor: 'white',
          }}
       >
          <Text
-         style={{
-            fontSize: Typography.sizes.title,
-            fontWeight: Typography.weights.bold,
-            color: Colors.textPrimary,
-         }}
+            style={{
+               fontSize: Typography.sizes.title,
+               fontWeight: Typography.weights.semiBold,
+               color: Colors.primary,
+               letterSpacing: 0.3,
+            }}
          >
-         {title}
+            {title}
          </Text>
       </View>
    );

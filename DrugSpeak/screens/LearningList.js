@@ -37,8 +37,6 @@ const LearningListScreen = ({ navigation }) => {
    const [currentExpanded, setCurrentExpanded] = useState(true);
    const [finishedExpanded, setFinishedExpanded] = useState(false);
 
-   // Check if the user is logged in before making API calls
-   // Now using UserDataHelper instead of duplicating this logic
    const checkUserLoggedIn = async () => {
       const isLoggedIn = await UserDataHelper.isUserLoggedIn();
       setIsUserLoggedIn(isLoggedIn);
@@ -47,14 +45,12 @@ const LearningListScreen = ({ navigation }) => {
 
    useEffect(() => {
       const syncStats = async () => {
-         // Only sync if counts have changed and user is logged in
          if ((studyStats.currentLearning !== currentLearning.length || 
-             studyStats.finishedLearning !== finishedLearning.length) && 
-             await checkUserLoggedIn()) {
+            studyStats.finishedLearning !== finishedLearning.length) && 
+            await checkUserLoggedIn()) {
             
             setSyncing(true);
             try {
-               // Use UserDataHelper.getCurrentUserSafe for consistent user data retrieval
                const user = await UserDataHelper.getCurrentUserSafe();
                if (user) {
                   const newStats = {
@@ -77,7 +73,6 @@ const LearningListScreen = ({ navigation }) => {
       syncStats();
    }, [currentLearning.length, finishedLearning.length]);
 
-   // Use UserDataHelper for consistent score calculation
    const calculateTotalScore = () => {
       return UserDataHelper.calculateTotalScore(learningList);
    };
@@ -87,7 +82,6 @@ const LearningListScreen = ({ navigation }) => {
          setLoading(true);
          setError(null);
          
-         // Check login status first using the helper
          const isLoggedIn = await checkUserLoggedIn();
          if (!isLoggedIn) {
             setLoading(false);
@@ -95,7 +89,6 @@ const LearningListScreen = ({ navigation }) => {
             return;
          }
          
-         // Get user from helper for consistent error handling
          const user = await UserDataHelper.getCurrentUserSafe();
          if (!user) {
             setLoading(false);
@@ -104,17 +97,14 @@ const LearningListScreen = ({ navigation }) => {
          }
          
          try {
-            // Calculate stats based on learning list
             const calculatedStats = {
                currentLearning: currentLearning.length,
                finishedLearning: finishedLearning.length,
                totalScore: calculateTotalScore()
             };
             
-            // Try to get the user's study record first
             const studyRecord = await RecordService.getStudyRecordById(user.id || user._id);
             
-            // Only update backend if counts have changed
             if (calculatedStats.currentLearning !== studyRecord.currentLearning || 
                   calculatedStats.finishedLearning !== studyRecord.finishedLearning ||
                   calculatedStats.totalScore !== studyRecord.totalScore) {
@@ -127,7 +117,6 @@ const LearningListScreen = ({ navigation }) => {
          } catch (error) {
             console.error('Error syncing stats from Redux state:', error);
             
-            // Just use calculated stats from redux state
             const calculatedStats = {
                currentLearning: currentLearning.length,
                finishedLearning: finishedLearning.length,
@@ -147,7 +136,6 @@ const LearningListScreen = ({ navigation }) => {
 
    const handleReviewDrug = async (drug) => {
       try {
-         // Check login status first
          const isLoggedIn = await checkUserLoggedIn();
          if (!isLoggedIn) {
             Alert.alert(
@@ -160,10 +148,8 @@ const LearningListScreen = ({ navigation }) => {
          
          setSyncing(true);
          
-         // Update Redux state first for immediate UI response
          dispatch(updateLearningStatus({ id: drug.id, status: 'current' }));
          
-         // Then sync with backend
          const updatedStats = {
             currentLearning: studyStats.currentLearning + 1,
             finishedLearning: studyStats.finishedLearning - 1,
@@ -193,7 +179,6 @@ const LearningListScreen = ({ navigation }) => {
 
    const handleRemoveDrug = async (drug) => {
       try {
-         // Check login status first
          const isLoggedIn = await checkUserLoggedIn();
          if (!isLoggedIn) {
             Alert.alert(
@@ -218,7 +203,6 @@ const LearningListScreen = ({ navigation }) => {
                   onPress: async () => {
                      setSyncing(true);
                      try {
-                        // Recheck login status just in case
                         if (!await checkUserLoggedIn()) {
                            Alert.alert(
                               "Operation Cancelled",
@@ -229,10 +213,8 @@ const LearningListScreen = ({ navigation }) => {
                            return;
                         }
                         
-                        // Update Redux state first for immediate UI response
                         dispatch(removeFromLearningList(drug.id));
                         
-                        // Then sync with backend
                         const updatedStats = {
                            currentLearning: drug.status === 'current' ? 
                               Math.max(0, studyStats.currentLearning - 1) : 
@@ -271,11 +253,10 @@ const LearningListScreen = ({ navigation }) => {
    };
 
    useEffect(() => {
-      // Initial check for login status
       checkUserLoggedIn().then(isLoggedIn => {
          if (isLoggedIn) {
             fetchStudyRecord();
-            loadLearningListData(); // Load learning data on mount
+            loadLearningListData(); 
          }
       });
       
@@ -283,16 +264,14 @@ const LearningListScreen = ({ navigation }) => {
          checkUserLoggedIn().then(isLoggedIn => {
             if (isLoggedIn) {
                fetchStudyRecord();
-               loadLearningListData(); // Load learning data when screen gets focus
+               loadLearningListData(); 
             }
          });
       });
       
-      // Also add an interval to periodically check login status
-      // This helps catch logout events that might happen in other screens
       const loginCheckInterval = setInterval(() => {
          checkUserLoggedIn();
-      }, 10000);  // Check every 10 seconds
+      }, 10000);  
       
       return () => {
          unsubscribe();
@@ -300,7 +279,6 @@ const LearningListScreen = ({ navigation }) => {
       };
    }, [navigation]);
 
-   // New function to load learning list data directly from AsyncStorage
    const loadLearningListData = async () => {
       try {
          const user = await AuthService.getCurrentUser();
@@ -310,15 +288,12 @@ const LearningListScreen = ({ navigation }) => {
          
          const userId = user.id || user._id;
          
-         // Use LearningDataService to load data directly
          const loadedList = await LearningDataService.loadLearningList(userId);
          
          if (loadedList && loadedList.length > 0) {
-            // Dispatch action to update Redux store with loaded data
             dispatch(setLearningList(loadedList));
          }
       } catch (error) {
-         // Error handling
       }
    };
 
@@ -326,14 +301,11 @@ const LearningListScreen = ({ navigation }) => {
       setRefreshing(true);
       fetchStudyRecord();
       
-      // Add direct learning list loading during refresh
       loadLearningListData();
       
-      // Add diagnostic check
       try {
          AuthService.inspectStorage();
       } catch (error) {
-         // Error handling
       }
    };
 
@@ -341,11 +313,9 @@ const LearningListScreen = ({ navigation }) => {
       navigation.navigate('LearningScreen', { drug });
    };
 
-   // Save learning list whenever it changes
    useEffect(() => {
       const saveLearningData = async () => {
          try {
-            // Check if user is logged in and not in the process of logging out
             const isLoggingOut = await AsyncStorage.getItem('isLoggingOut');
             if (isLoggingOut === 'true') {
                return;
@@ -360,17 +330,14 @@ const LearningListScreen = ({ navigation }) => {
             
             await LearningDataService.saveLearningList(userId, learningList);
          } catch (error) {
-            // Error handling
          }
       };
       
-      // Only save if we have items
       if (learningList.length > 0) {
          saveLearningData();
       }
    }, [learningList]);
 
-   // Using our new shared LoadingIndicator component
    if (loading && !refreshing) {
       return <LoadingIndicator.FullScreen message="Loading your study progress..." />;
    }

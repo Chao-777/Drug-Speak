@@ -29,7 +29,8 @@ const styles = StyleSheet.create({
       marginTop: Spacing.xl,
    },
    text: {
-      fontSize: Typography.sizes.small,
+      fontSize: Typography.sizes.body,
+      textDecorationLine: 'underline',
    },
 });
 

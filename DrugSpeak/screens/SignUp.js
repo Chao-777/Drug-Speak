@@ -23,35 +23,30 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
    const validateForm = () => {
       const errors = {};
       
-      // Username validation
       if (!userName) {
          errors.userName = 'Username is required';
       } else if (userName.length < 3) {
          errors.userName = 'Username must be at least 3 characters';
       }
       
-      // Email validation
       if (!email) {
          errors.email = 'Email is required';
       } else if (!/\S+@\S+\.\S+/.test(email)) {
          errors.email = 'Please enter a valid email';
       }
       
-      // Password validation
       if (!password) {
          errors.password = 'Password is required';
       } else if (password.length < 6) {
          errors.password = 'Password must be at least 6 characters';
       }
       
-      // Confirm password validation
       if (!confirmPassword) {
          errors.confirmPassword = 'Please confirm your password';
       } else if (confirmPassword !== password) {
          errors.confirmPassword = 'Passwords do not match';
       }
       
-      // Gender validation
       if (!gender) {
          errors.gender = 'Please select a gender';
       }
@@ -69,17 +64,15 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
       
       setLoading(true);
       try {
-         const result = await AuthService.register({
+         await AuthService.register({
             username: userName,
             email,
             password,
             gender,
          });
          
-         // Save email for easier sign in next time
          await AuthService.saveLastEmail(email);
          
-         // Success!
          setIsLoggedIn(true);
       } catch (error) {
          setError(error.message || 'Registration failed. Please try again.');
@@ -123,9 +116,7 @@ const SignUpScreen = ({ navigation, setIsLoggedIn }) => {
             editable={!loading}
             error={validationErrors.userName}
          />
-         
 
-         
          <GenderSelector
             selectedGender={gender}
             onSelectGender={(value) => {
@@ -213,15 +204,17 @@ const styles = StyleSheet.create({
       marginRight: Spacing.md,
    },
    errorContainer: {
-      backgroundColor: Colors.error + '20',
-      borderRadius: 5,
+      backgroundColor: Colors.error + '12',
+      borderRadius: 6,
+      borderLeftWidth: 3,
+      borderLeftColor: Colors.error,
       padding: Spacing.sm,
+      paddingLeft: Spacing.md,
       marginBottom: Spacing.md,
    },
    errorText: {
       color: Colors.error,
       fontSize: Typography.sizes.body,
-      textAlign: 'center',
    },
 });
 
