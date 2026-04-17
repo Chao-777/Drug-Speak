@@ -178,7 +178,7 @@ const CommunityScreen = ({ navigation }) => {
           {item.gender || 'Not specified'}
         </Text>
         <Text style={[styles.cellText, styles.progressColumn]}>
-          {item.score}({item.currentLearning})({item.finishedLearning})
+          {item.score} / {item.currentLearning} / {item.finishedLearning}
         </Text>
       </View>
     );
@@ -187,7 +187,7 @@ const CommunityScreen = ({ navigation }) => {
   const renderFooterNote = () => (
     <View style={styles.footerNote}>
       <Text style={styles.footerText}>
-        * The Progress shows Total Score (Current Learning) (Finished)
+        * Progress: Score / Current / Finished
       </Text>
     </View>
   );
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: Spacing.md,
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     color: Colors.textSecondary,
   },
   errorContainer: {
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: Spacing.md,
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     color: Colors.error,
     textAlign: 'center',
   },
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: Colors.white,
+    color: 'white',
     fontWeight: Typography.weights.bold,
   },
   list: {
@@ -315,9 +315,9 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: Colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.primaryDark,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
   },
@@ -327,15 +327,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: 'white',
   },
   highlightedRow: {
-    backgroundColor: Colors.highlight,
+    backgroundColor: Colors.primary + '18',
   },
   headerText: {
-    fontWeight: Typography.weights.bold,
-    color: Colors.textPrimary,
+    fontWeight: Typography.weights.semiBold,
+    color: 'white',
     fontSize: Typography.sizes.small,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   cellText: {
     color: Colors.textPrimary,
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressColumn: {
-    width: 100,
+    width: 110,
     textAlign: 'right',
   },
   footerNote: {
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   yourRankText: {
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
     color: 'white',
   },
@@ -396,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginText: {
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     fontWeight: Typography.weights.bold,
     color: 'white',
   },

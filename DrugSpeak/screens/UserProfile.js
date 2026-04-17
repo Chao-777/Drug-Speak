@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Alert, RefreshControl } from 'react-native';
-import { Colors, Spacing, Borders, Typography } from '../constants/color';
+import { Colors, Spacing } from '../constants/color';
 import AuthService from '../api/authService';
 import UserService from '../api/userService';
 import RecordService from '../api/recordService';
@@ -289,7 +289,7 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
                      
                      await new Promise(resolve => setTimeout(resolve, 3000));
                      
-                     const logoutSuccess = await AuthService.logout();
+                     await AuthService.logout();
                      
                      setTimeout(() => {
                         if (setIsLoggedIn) {
@@ -428,21 +428,6 @@ const UserProfileScreen = ({ navigation, setIsLoggedIn }) => {
    );
 };
 
-const formatDate = (dateString) => {
-   if (!dateString) return 'N/A';
-   
-   try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-         month: 'long',
-         day: 'numeric',
-         year: 'numeric'
-      });
-   } catch (e) {
-      return 'N/A';
-   }
-};
-
 const styles = StyleSheet.create({
    container: {
       flex: 1,
@@ -468,30 +453,6 @@ const styles = StyleSheet.create({
       marginHorizontal: Spacing.sm,
       flex: 1,
    },
-   profileHeader: {
-      alignItems: 'center',
-      padding: Spacing.lg,
-      backgroundColor: Colors.glass.background,
-      borderRadius: Borders.radius.medium,
-      marginHorizontal: Spacing.md,
-      marginTop: Spacing.lg,
-      shadowColor: Colors.glass.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 5,
-   },
-   welcomeText: {
-      fontSize: Typography.sizes.heading,
-      fontWeight: Typography.weights.bold,
-      color: Colors.textPrimary,
-      marginTop: Spacing.md,
-   },
-   joinedText: {
-      fontSize: Typography.sizes.body,
-      color: Colors.textSecondary,
-      marginTop: Spacing.xs,
-   }
 });
 
 export default UserProfileScreen;

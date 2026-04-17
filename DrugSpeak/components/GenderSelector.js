@@ -61,24 +61,25 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       justifyContent: 'flex-start',
       paddingVertical: Spacing.xs,
-      borderRadius: 4,
+      borderRadius: 6,
    },
    genderContainerError: {
       backgroundColor: Colors.error + '05',
       borderWidth: 1,
       borderColor: Colors.error,
       padding: Spacing.xs,
+      borderRadius: 6,
    },
    genderButton: {
-      backgroundColor: '#ECECEC',
+      backgroundColor: 'white',
       paddingVertical: Spacing.sm,
       paddingHorizontal: Spacing.lg,
       borderRadius: 20,
-      minWidth: 80,
+      minWidth: 90,
       alignItems: 'center',
       marginRight: Spacing.md,
       borderWidth: 1,
-      borderColor: '#DDDDDD',
+      borderColor: Colors.border,
    },
    genderButtonSelected: {
       backgroundColor: Colors.primary,
@@ -87,9 +88,11 @@ const styles = StyleSheet.create({
    genderButtonText: {
       color: Colors.textSecondary,
       fontWeight: Typography.weights.medium,
+      fontSize: Typography.sizes.body,
    },
    genderButtonTextSelected: {
       color: 'white',
+      fontWeight: Typography.weights.semiBold,
    },
    disabledButton: {
       opacity: 0.7,

@@ -169,15 +169,17 @@ const styles = StyleSheet.create({
       marginRight: Spacing.md,
    },
    errorContainer: {
-      backgroundColor: Colors.error + '20',
-      borderRadius: 5,
+      backgroundColor: Colors.error + '12',
+      borderRadius: 6,
+      borderLeftWidth: 3,
+      borderLeftColor: Colors.error,
       padding: Spacing.sm,
+      paddingLeft: Spacing.md,
       marginBottom: Spacing.md,
    },
    errorText: {
       color: Colors.error,
       fontSize: Typography.sizes.body,
-      textAlign: 'center',
    },
    loadingContainer: {
       flex: 1,

@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderRadius: 8,
   },
   playButton: {
     width: 40,

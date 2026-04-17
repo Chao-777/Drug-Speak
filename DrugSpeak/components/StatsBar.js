@@ -111,10 +111,12 @@ const styles = StyleSheet.create({
       fontSize: Typography.sizes.small,
       color: Colors.textSecondary,
       marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
    },
    statValue: {
       fontSize: Typography.sizes.title,
-      fontWeight: Typography.weights.bold,
+      fontWeight: Typography.weights.semiBold,
    },
    divider: {
       width: 1,

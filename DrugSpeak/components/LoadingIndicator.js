@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   text: {
     marginLeft: Spacing.md,
-    fontSize: Typography.sizes.medium,
+    fontSize: Typography.sizes.body,
     color: Colors.textSecondary,
   },
   inlineContainer: {
@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     borderRadius: 8,
     elevation: 5,
-    shadowColor: Colors.shadow,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
   }
 });

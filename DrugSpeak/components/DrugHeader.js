@@ -44,28 +44,16 @@ const styles = StyleSheet.create({
       marginRight: 4,
    },
    score: {
-      fontSize: Typography.sizes.subheading,
-      fontWeight: Typography.weights.bold,
+      fontSize: Typography.sizes.subtitle,
+      fontWeight: Typography.weights.semiBold,
       color: Colors.secondary,
    },
    formula: {
       fontSize: Typography.sizes.body,
       color: Colors.textSecondary,
       marginTop: Spacing.xs,
+      letterSpacing: 0.5,
    },
-   badge: {
-      backgroundColor: Colors.success,
-      padding: Spacing.xs,
-      paddingHorizontal: Spacing.md,
-      borderRadius: Borders.radius.small,
-      marginTop: Spacing.sm,
-   },
-   badgeText: {
-      color: 'white',
-      fontWeight: Typography.weights.bold,
-      fontSize: Typography.sizes.small,
-      textAlign: 'center',
-   }
 });
 
 export default DrugHeader;

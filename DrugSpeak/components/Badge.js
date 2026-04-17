@@ -6,18 +6,20 @@ const Badge = ({ text, backgroundColor = Colors.success, textColor = 'white' }) 
    return (
       <View style={{
          backgroundColor,
-         padding: Spacing.xs,
+         paddingVertical: Spacing.xs,
          paddingHorizontal: Spacing.md,
-         borderRadius: Borders.radius.small,
+         borderRadius: Borders.radius.round,
          marginTop: Spacing.sm,
+         alignSelf: 'center',
       }}>
          <Text style={{
-         color: textColor,
-         fontWeight: Typography.weights.bold,
-         fontSize: Typography.sizes.small,
-         textAlign: 'center',
+            color: textColor,
+            fontWeight: Typography.weights.semiBold,
+            fontSize: Typography.sizes.small,
+            textAlign: 'center',
+            letterSpacing: 0.3,
          }}>
-         {text}
+            {text}
          </Text>
       </View>
    );
